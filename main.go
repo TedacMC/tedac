@@ -4,14 +4,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"github.com/pelletier/go-toml"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/tedacmc/tedac/tedac"
 	"io/ioutil"
 	"log"
 	"os"
 	"sync"
+
+	"github.com/pelletier/go-toml"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/tedacmc/tedac/tedac"
 
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
@@ -61,7 +61,6 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 		clientData.SkinResourcePatch = base64.StdEncoding.EncodeToString([]byte(defaultSkinResourcePatch))
 		clientData.SkinImageHeight = 64
 		clientData.SkinImageWidth = 64
-		fmt.Println(clientData.Validate())
 	}
 
 	b, _ := json.Marshal(clientData)

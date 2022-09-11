@@ -2,6 +2,7 @@ package tedac
 
 import (
 	"fmt"
+
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	legacypacket "github.com/tedacmc/tedac/tedac/packet"
@@ -35,6 +36,7 @@ func (Protocol) Encryption(key [32]byte) packet.Encryption {
 
 // ConvertToLatest ...
 func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
+	fmt.Printf("1.12 -> 1.19: %T\n", pk)
 	switch pk := pk.(type) {
 	case *legacypacket.MovePlayer:
 		return []packet.Packet{
@@ -51,12 +53,12 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 			},
 		}
 	}
-	fmt.Printf("1.12 -> 1.19: %T\n", pk)
 	return []packet.Packet{pk}
 }
 
 // ConvertFromLatest ...
 func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
+	fmt.Printf("1.19 -> 1.12: %T\n", pk)
 	switch pk := pk.(type) {
 	case *packet.MovePlayer:
 		return []packet.Packet{
@@ -73,7 +75,61 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 				// TeleportItem: ???
 			},
 		}
+	case *packet.StartGame:
+		gamerules := make(map[string]interface{})
+		for _, gr := range pk.GameRules {
+			gamerules[gr.Name] = gr.Value
+		}
+		return []packet.Packet{
+			&legacypacket.StartGame{
+				EntityUniqueID:                 pk.EntityUniqueID,
+				EntityRuntimeID:                pk.EntityRuntimeID,
+				PlayerGameMode:                 pk.PlayerGameMode,
+				PlayerPosition:                 pk.PlayerPosition,
+				Pitch:                          pk.Pitch,
+				Yaw:                            pk.Yaw,
+				WorldSeed:                      int32(pk.WorldSeed),
+				Dimension:                      pk.Dimension,
+				Generator:                      pk.Generator,
+				WorldGameMode:                  pk.WorldGameMode,
+				Difficulty:                     pk.Difficulty,
+				WorldSpawn:                     pk.WorldSpawn,
+				AchievementsDisabled:           pk.AchievementsDisabled,
+				DayCycleLockTime:               pk.DayCycleLockTime,
+				EducationMode:                  false, // no nigga uses this
+				EducationFeaturesEnabled:       false, // again, no nigga uses this
+				RainLevel:                      pk.RainLevel,
+				LightningLevel:                 pk.LightningLevel,
+				ConfirmedPlatformLockedContent: pk.ConfirmedPlatformLockedContent,
+				MultiPlayerGame:                pk.MultiPlayerGame,
+				LANBroadcastEnabled:            pk.LANBroadcastEnabled,
+				XBLBroadcastMode:               pk.XBLBroadcastMode,
+				PlatformBroadcastMode:          pk.PlatformBroadcastMode,
+				CommandsEnabled:                pk.CommandsEnabled,
+				TexturePackRequired:            pk.TexturePackRequired,
+				GameRules:                      gamerules,
+				BonusChestEnabled:              pk.BonusChestEnabled,
+				StartWithMapEnabled:            pk.StartWithMapEnabled,
+				PlayerPermissions:              int32(pk.PlayerPermissions),
+				ServerChunkTickRadius:          pk.ServerChunkTickRadius,
+				HasLockedBehaviourPack:         pk.HasLockedBehaviourPack,
+				HasLockedTexturePack:           pk.HasLockedTexturePack,
+				FromLockedWorldTemplate:        pk.FromLockedWorldTemplate,
+				MSAGamerTagsOnly:               pk.MSAGamerTagsOnly,
+				FromWorldTemplate:              pk.FromWorldTemplate,
+				WorldTemplateSettingsLocked:    pk.WorldTemplateSettingsLocked,
+				OnlySpawnV1Villagers:           pk.OnlySpawnV1Villagers,
+				LevelID:                        pk.LevelID,
+				WorldName:                      pk.WorldName,
+				PremiumWorldTemplateID:         "",
+				Trial:                          pk.Trial,
+				Time:                           pk.Time,
+				EnchantmentSeed:                pk.EnchantmentSeed,
+				Blocks:                         pk.Blocks,
+				Items:                          pk.Items,
+				MultiPlayerCorrelationID:       pk.MultiPlayerCorrelationID,
+			},
+		}
 	}
-	fmt.Printf("1.19 -> 1.12: %T\n", pk)
 	return []packet.Packet{pk}
 }
