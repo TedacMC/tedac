@@ -1,9 +1,10 @@
-package packet
+package legacypacket
 
 import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 )
 
 // StartGame is sent by the server to send information about the world the player will be spawned in. It
@@ -14,7 +15,7 @@ type StartGame struct {
 	// different sessions of the same world, but most servers simply fill the runtime ID of the entity out for
 	// this field.
 	EntityUniqueID int64
-	// EntityNetworkID is the runtime ID of the player. The runtime ID is unique for each world session, and
+	// EntityRuntimeID is the runtime ID of the player. The runtime ID is unique for each world session, and
 	// entities are generally identified in packets using this runtime ID.
 	EntityRuntimeID uint64
 	// PlayerGameMode is the game mode the player currently has. It is a value from 0-4, with 0 being
@@ -89,7 +90,7 @@ type StartGame struct {
 	// GameRules defines game rules currently active with their respective values. The value of these game
 	// rules may be either 'bool', 'int32' or 'float32'. Some game rules are server side only, and don't
 	// necessarily need to be sent to the client.
-	GameRules map[string]interface{}
+	GameRules map[string]any
 	// BonusChestEnabled specifies if the world had the bonus map setting enabled when generating it. It does
 	// not have any effect client-side.
 	BonusChestEnabled bool
@@ -147,20 +148,21 @@ type StartGame struct {
 	// Blocks is a list of all blocks and variants existing in the game. Failing to send any of the blocks
 	// that are in the game, including any specific variants of that block, will crash mobile clients. It
 	// seems Windows 10 games do not crash.
-	Blocks []protocol.BlockEntry
+	Blocks []legacyprotocol.BlockEntry
 	// Items is a list of all items with their legacy IDs which are available in the game. Failing to send any
 	// of the items that are in the game will crash mobile clients.
-	Items []protocol.ItemEntry
+	Items []legacyprotocol.ItemEntry
 	// MultiPlayerCorrelationID is a unique ID specifying the multi-player session of the player. A random
 	// UUID should be filled out for this field.
 	MultiPlayerCorrelationID string
 }
 
 // ID ...
-func (p *StartGame) ID() uint32 {
+func (*StartGame) ID() uint32 {
 	return packet.IDStartGame
 }
 
+// Marshal ...
 func (pk *StartGame) Marshal(w *protocol.Writer) {
 	w.Varint64(&pk.EntityUniqueID)
 	w.Varuint64(&pk.EntityRuntimeID)
@@ -168,7 +170,7 @@ func (pk *StartGame) Marshal(w *protocol.Writer) {
 	w.Vec3(&pk.PlayerPosition)
 	w.Float32(&pk.Pitch)
 	w.Float32(&pk.Yaw)
-	w.Int32(&pk.WorldSeed)
+	w.Varint32(&pk.WorldSeed)
 	w.Varint32(&pk.Dimension)
 	w.Varint32(&pk.Generator)
 	w.Varint32(&pk.WorldGameMode)
@@ -187,19 +189,10 @@ func (pk *StartGame) Marshal(w *protocol.Writer) {
 	w.Varint32(&pk.PlatformBroadcastMode)
 	w.Bool(&pk.CommandsEnabled)
 	w.Bool(&pk.TexturePackRequired)
-	gamerules := []protocol.GameRule{}
-	for n, v := range pk.GameRules {
-		gamerules = append(gamerules, protocol.GameRule{
-			Name:                  n,
-			Value:                 v,
-			CanBeModifiedByPlayer: false,
-		})
-
-	}
-	protocol.FuncSlice(w, &gamerules, w.GameRule)
+	legacyprotocol.WriteGameRules(w, &pk.GameRules)
 	w.Bool(&pk.BonusChestEnabled)
 	w.Bool(&pk.StartWithMapEnabled)
-	w.Int32(&pk.PlayerPermissions)
+	w.Varint32(&pk.PlayerPermissions)
 	w.Int32(&pk.ServerChunkTickRadius)
 	w.Bool(&pk.HasLockedBehaviourPack)
 	w.Bool(&pk.HasLockedTexturePack)
@@ -219,7 +212,10 @@ func (pk *StartGame) Marshal(w *protocol.Writer) {
 	w.String(&pk.MultiPlayerCorrelationID)
 }
 
+// Unmarshal ...
 func (pk *StartGame) Unmarshal(r *protocol.Reader) {
+	pk.GameRules = make(map[string]any)
+
 	r.Varint64(&pk.EntityUniqueID)
 	r.Varuint64(&pk.EntityRuntimeID)
 	r.Varint32(&pk.PlayerGameMode)
@@ -245,18 +241,10 @@ func (pk *StartGame) Unmarshal(r *protocol.Reader) {
 	r.Varint32(&pk.PlatformBroadcastMode)
 	r.Bool(&pk.CommandsEnabled)
 	r.Bool(&pk.TexturePackRequired)
-	gamerules := []protocol.GameRule{}
-	for n, v := range pk.GameRules {
-		gamerules = append(gamerules, protocol.GameRule{
-			Name:                  n,
-			Value:                 v,
-			CanBeModifiedByPlayer: false,
-		})
-
-	}
-	protocol.FuncSlice(r, &gamerules, r.GameRule)
+	legacyprotocol.GameRules(r, &pk.GameRules)
 	r.Bool(&pk.BonusChestEnabled)
 	r.Bool(&pk.StartWithMapEnabled)
+	r.Varint32(&pk.PlayerPermissions)
 	r.Int32(&pk.ServerChunkTickRadius)
 	r.Bool(&pk.HasLockedBehaviourPack)
 	r.Bool(&pk.HasLockedTexturePack)

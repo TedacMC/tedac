@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/go-gl/mathgl v1.0.0
 	github.com/pelletier/go-toml v1.9.5
+	github.com/samber/lo v1.28.0
 	github.com/sandertv/go-raknet v1.11.1
 	github.com/sandertv/gophertunnel v1.24.6
 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1

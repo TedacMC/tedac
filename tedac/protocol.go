@@ -2,10 +2,11 @@ package tedac
 
 import (
 	"fmt"
-
+	"github.com/samber/lo"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	legacypacket "github.com/tedacmc/tedac/tedac/packet"
+	legacypacket2 "github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
 	_ "github.com/tedacmc/tedac/tedac/raknet"
 )
 
@@ -25,7 +26,7 @@ func (Protocol) Ver() string {
 // Packets ...
 func (Protocol) Packets() packet.Pool {
 	p := packet.NewPool()
-	p[packet.IDMovePlayer] = func() packet.Packet { return &legacypacket.MovePlayer{} }
+	p[packet.IDMovePlayer] = func() packet.Packet { return &legacypacket2.MovePlayer{} }
 	return packet.NewPool()
 }
 
@@ -38,7 +39,7 @@ func (Protocol) Encryption(key [32]byte) packet.Encryption {
 func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
 	fmt.Printf("1.12 -> 1.19: %T\n", pk)
 	switch pk := pk.(type) {
-	case *legacypacket.MovePlayer:
+	case *legacypacket2.MovePlayer:
 		return []packet.Packet{
 			&packet.MovePlayer{
 				EntityRuntimeID:       pk.EntityRuntimeID,
@@ -62,7 +63,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 	switch pk := pk.(type) {
 	case *packet.MovePlayer:
 		return []packet.Packet{
-			&legacypacket.MovePlayer{
+			&legacypacket2.MovePlayer{
 				EntityRuntimeID:       pk.EntityRuntimeID,
 				Position:              pk.Position,
 				Pitch:                 pk.Pitch,
@@ -72,16 +73,15 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 				OnGround:              pk.OnGround,
 				RiddenEntityRuntimeID: pk.RiddenEntityRuntimeID,
 				TeleportCause:         pk.TeleportCause,
-				// TeleportItem: ???
 			},
 		}
 	case *packet.StartGame:
-		gamerules := make(map[string]interface{})
+		gameRules := make(map[string]any)
 		for _, gr := range pk.GameRules {
-			gamerules[gr.Name] = gr.Value
+			gameRules[gr.Name] = gr.Value
 		}
 		return []packet.Packet{
-			&legacypacket.StartGame{
+			&legacypacket2.StartGame{
 				EntityUniqueID:                 pk.EntityUniqueID,
 				EntityRuntimeID:                pk.EntityRuntimeID,
 				PlayerGameMode:                 pk.PlayerGameMode,
@@ -96,8 +96,6 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 				WorldSpawn:                     pk.WorldSpawn,
 				AchievementsDisabled:           pk.AchievementsDisabled,
 				DayCycleLockTime:               pk.DayCycleLockTime,
-				EducationMode:                  false, // no nigga uses this
-				EducationFeaturesEnabled:       false, // again, no nigga uses this
 				RainLevel:                      pk.RainLevel,
 				LightningLevel:                 pk.LightningLevel,
 				ConfirmedPlatformLockedContent: pk.ConfirmedPlatformLockedContent,
@@ -107,7 +105,6 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 				PlatformBroadcastMode:          pk.PlatformBroadcastMode,
 				CommandsEnabled:                pk.CommandsEnabled,
 				TexturePackRequired:            pk.TexturePackRequired,
-				GameRules:                      gamerules,
 				BonusChestEnabled:              pk.BonusChestEnabled,
 				StartWithMapEnabled:            pk.StartWithMapEnabled,
 				PlayerPermissions:              int32(pk.PlayerPermissions),
@@ -121,13 +118,15 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 				OnlySpawnV1Villagers:           pk.OnlySpawnV1Villagers,
 				LevelID:                        pk.LevelID,
 				WorldName:                      pk.WorldName,
-				PremiumWorldTemplateID:         "",
 				Trial:                          pk.Trial,
 				Time:                           pk.Time,
 				EnchantmentSeed:                pk.EnchantmentSeed,
 				Blocks:                         pk.Blocks,
 				Items:                          pk.Items,
 				MultiPlayerCorrelationID:       pk.MultiPlayerCorrelationID,
+				GameRules: lo.SliceToMap(pk.GameRules, func(rule protocol.GameRule) (string, any) {
+					return rule.Name, rule.Value
+				}),
 			},
 		}
 	}
