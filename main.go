@@ -1,102 +1,127 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/pelletier/go-toml"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/tedacmc/tedac/tedac"
 	"io/ioutil"
 	"log"
 	"os"
 	"sync"
 
-	"github.com/pelletier/go-toml"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
-	"github.com/tedacmc/tedac/tedac"
 	"golang.org/x/oauth2"
 )
 
+// The following program implements a proxy that forwards players from one local address to a remote address.
 func main() {
-	tok := tokenSource()
-	listener, err := minecraft.ListenConfig{
-		StatusProvider:    minecraft.NewStatusProvider("Tedac Listen Test"),
-		AcceptedProtocols: []minecraft.Protocol{tedac.Protocol{}},
-	}.Listen("raknet", ":19132")
+	conf := readConfig()
+	src := tokenSource()
+
+	p, err := minecraft.NewForeignStatusProvider(conf.Connection.RemoteAddress)
 	if err != nil {
 		panic(err)
 	}
-
+	listener, err := minecraft.ListenConfig{
+		StatusProvider:    p,
+		AcceptedProtocols: []minecraft.Protocol{tedac.Protocol{}},
+	}.Listen("raknet", conf.Connection.LocalAddress)
+	if err != nil {
+		panic(err)
+	}
+	defer listener.Close()
 	for {
-		// Accept connections in a for loop. Accept will only return an error if the minecraft.Listener is
-		// closed. (So never unexpectedly.)
 		c, err := listener.Accept()
 		if err != nil {
-			return
+			panic(err)
 		}
-		conn := c.(*minecraft.Conn)
-
-		go func() {
-			// Process the connection on another goroutine as you would with TCP connections.
-			defer conn.Close()
-			clientData := conn.ClientData()
-			serverConn, err := minecraft.Dialer{
-				TokenSource: tok,
-				ClientData:  clientData,
-			}.Dial("raknet", "127.0.0.1:19133")
-
-			if err != nil {
-				panic(err)
-			}
-
-			var g sync.WaitGroup
-			g.Add(2)
-			go func() {
-				if err := conn.StartGame(serverConn.GameData()); err != nil {
-					panic(err)
-				}
-				g.Done()
-			}()
-			go func() {
-				if err := serverConn.DoSpawn(); err != nil {
-					panic(err)
-				}
-				g.Done()
-			}()
-			g.Wait()
-
-			go func() {
-				defer listener.Disconnect(conn, "connection lost")
-				defer serverConn.Close()
-				for {
-					pk, err := conn.ReadPacket()
-					if err != nil {
-						return
-					}
-					if err := serverConn.WritePacket(pk); err != nil {
-						if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-							_ = listener.Disconnect(conn, disconnect.Error())
-						}
-						return
-					}
-				}
-			}()
-			go func() {
-				defer serverConn.Close()
-				defer listener.Disconnect(conn, "connection lost")
-				for {
-					pk, err := serverConn.ReadPacket()
-					if err != nil {
-						if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-							_ = listener.Disconnect(conn, disconnect.Error())
-						}
-						return
-					}
-					if err := conn.WritePacket(pk); err != nil {
-						return
-					}
-				}
-			}()
-		}()
+		go handleConn(c.(*minecraft.Conn), listener, conf, src)
 	}
+}
+
+// defaultSkinResourcePatch holds the skin resource patch assigned to a player when they wear a custom skin.
+const defaultSkinResourcePatch = `{
+   "geometry" : {
+      "default" : "geometry.humanoid.custom"
+   }
+}
+`
+
+// handleConn handles a new incoming minecraft.Conn from the minecraft.Listener passed.
+func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config config, src oauth2.TokenSource) {
+	clientData := conn.ClientData()
+	if _, ok := conn.Protocol().(tedac.Protocol); ok {
+		clientData.GameVersion = protocol.CurrentVersion
+
+		clientData.SkinResourcePatch = base64.StdEncoding.EncodeToString([]byte(defaultSkinResourcePatch))
+		clientData.SkinImageHeight = 64
+		clientData.SkinImageWidth = 64
+		fmt.Println(clientData.Validate())
+	}
+
+	b, _ := json.Marshal(clientData)
+	_ = os.WriteFile("client_data.json", b, 0644)
+
+	serverConn, err := minecraft.Dialer{
+		TokenSource: src,
+		ClientData:  clientData,
+	}.Dial("raknet", config.Connection.RemoteAddress)
+	if err != nil {
+		panic(err)
+	}
+	var g sync.WaitGroup
+	g.Add(2)
+	go func() {
+		if err := conn.StartGame(serverConn.GameData()); err != nil {
+			panic(err)
+		}
+		g.Done()
+	}()
+	go func() {
+		if err := serverConn.DoSpawn(); err != nil {
+			panic(err)
+		}
+		g.Done()
+	}()
+	g.Wait()
+
+	go func() {
+		defer listener.Disconnect(conn, "connection lost")
+		defer serverConn.Close()
+		for {
+			pk, err := conn.ReadPacket()
+			if err != nil {
+				return
+			}
+			if err := serverConn.WritePacket(pk); err != nil {
+				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+					_ = listener.Disconnect(conn, disconnect.Error())
+				}
+				return
+			}
+		}
+	}()
+	go func() {
+		defer serverConn.Close()
+		defer listener.Disconnect(conn, "connection lost")
+		for {
+			pk, err := serverConn.ReadPacket()
+			if err != nil {
+				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+					_ = listener.Disconnect(conn, disconnect.Error())
+				}
+				return
+			}
+			if err := conn.WritePacket(pk); err != nil {
+				return
+			}
+		}
+	}()
 }
 
 type config struct {
@@ -122,7 +147,7 @@ func readConfig() config {
 		}
 		_ = f.Close()
 	}
-	data, err := ioutil.ReadFile("config.toml")
+	data, err := os.ReadFile("config.toml")
 	if err != nil {
 		log.Fatalf("error reading config: %v", err)
 	}
@@ -132,11 +157,8 @@ func readConfig() config {
 	if c.Connection.LocalAddress == "" {
 		c.Connection.LocalAddress = "0.0.0.0:19132"
 	}
-	if c.Connection.RemoteAddress == "" {
-		c.Connection.RemoteAddress = "vasar.land:19132"
-	}
 	data, _ = toml.Marshal(c)
-	if err := ioutil.WriteFile("config.toml", data, 0644); err != nil {
+	if err := os.WriteFile("config.toml", data, 0644); err != nil {
 		log.Fatalf("error writing config file: %v", err)
 	}
 	return c
