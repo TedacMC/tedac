@@ -1,7 +1,8 @@
-package raknet
+package tedac
 
 import (
 	"bytes"
+	"crypto/aes"
 	"crypto/cipher"
 	"crypto/sha256"
 	"encoding/binary"
@@ -9,26 +10,28 @@ import (
 	"fmt"
 )
 
-// Cfb holds an encryption session with several fields required to encryption and/or decrypt incoming
+// cfb holds an encryption session with several fields required to encryption and/or decrypt incoming
 // packets.
-type Cfb struct {
+type cfb struct {
 	sendCounter int64
 	keyBytes    []byte
 	cipherBlock cipher.Block
 	iv          []byte
 }
 
-func NewCfb(keyBytes []byte, cipherBlock cipher.Block, iv []byte) *Cfb {
-	return &Cfb{
-		sendCounter: 0,
+// newCFBEncryption returns a new encryption 'session' using the secret key bytes passed. The session has its cipher
+// block and IV prepared so that it may be used to decrypt and encrypt data.
+func newCFBEncryption(keyBytes []byte) *cfb {
+	block, _ := aes.NewCipher(keyBytes[:])
+	return &cfb{
 		keyBytes:    keyBytes,
-		cipherBlock: cipherBlock,
-		iv:          iv,
+		cipherBlock: block,
+		iv:          append([]byte(nil), keyBytes[:aes.BlockSize]...),
 	}
 }
 
 // Encrypt ...
-func (c *Cfb) Encrypt(data []byte) []byte {
+func (c *cfb) Encrypt(data []byte) []byte {
 	// We first write the current send counter to a buffer and use it to produce a packet checksum.
 	buf := bytes.NewBuffer(make([]byte, 0, 8))
 	_ = binary.Write(buf, binary.LittleEndian, c.sendCounter)
@@ -57,7 +60,7 @@ func (c *Cfb) Encrypt(data []byte) []byte {
 }
 
 // Decrypt ...
-func (c *Cfb) Decrypt(data []byte) {
+func (c *cfb) Decrypt(data []byte) {
 	for offset, b := range data {
 		// Create a new CFBDecrypter for each byte, as we're dealing with CFB8 and have a new IV after each
 		// byte that we decrypt.
@@ -70,7 +73,7 @@ func (c *Cfb) Decrypt(data []byte) {
 }
 
 // Verify ...
-func (c *Cfb) Verify(data []byte) error {
+func (c *cfb) Verify(data []byte) error {
 	sum := data[len(data)-8:]
 
 	// We first write the current send counter to a buffer and use it to produce a packet checksum.

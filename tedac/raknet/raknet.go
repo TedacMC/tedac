@@ -1,7 +1,6 @@
 package raknet
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/sandertv/go-raknet"
@@ -20,16 +19,15 @@ const legacyRakNet = 9
 // Listen ...
 func (MultiRakNet) Listen(address string) (minecraft.NetworkListener, error) {
 	return raknet.ListenConfig{
-		ProtocolVersions: []byte{legacyRakNet, 10}, // Version 9 is required for v1.12.0 MV.
+		ProtocolVersions: []byte{9}, // Version 9 is required for v1.12.0 MV.
 	}.Listen(address)
 }
 
 // Compression ...
 func (MultiRakNet) Compression(conn net.Conn) packet.Compression {
-	fmt.Println(conn.(*raknet.Conn).ProtocolVersion())
 	switch conn.(*raknet.Conn).ProtocolVersion() {
 	case legacyRakNet:
-		return zLibCompression{}
+		return ZLibCompression{}
 	}
 	return packet.FlateCompression{}
 }

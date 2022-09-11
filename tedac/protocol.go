@@ -1,13 +1,11 @@
 package tedac
 
 import (
-	"crypto/aes"
-
-	legacypacket "github.com/tedacmc/tedac/tedac/packet"
-	"github.com/tedacmc/tedac/tedac/raknet"
-
+	"fmt"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	legacypacket "github.com/tedacmc/tedac/tedac/packet"
+	_ "github.com/tedacmc/tedac/tedac/raknet"
 )
 
 // Protocol represents the v1.12.0 Protocol implementation.
@@ -32,12 +30,7 @@ func (Protocol) Packets() packet.Pool {
 
 // Encryption ...
 func (Protocol) Encryption(key [32]byte) packet.Encryption {
-	block, _ := aes.NewCipher(key[:])
-	return raknet.NewCfb(
-		key[:],
-		block,
-		append([]byte(nil), key[:aes.BlockSize]...),
-	)
+	return newCFBEncryption(key[:])
 }
 
 // ConvertToLatest ...
@@ -58,6 +51,7 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 			},
 		}
 	}
+	fmt.Printf("1.12 -> 1.19: %T\n", pk)
 	return []packet.Packet{pk}
 }
 
@@ -80,5 +74,6 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 			},
 		}
 	}
+	fmt.Printf("1.19 -> 1.12: %T\n", pk)
 	return []packet.Packet{pk}
 }
