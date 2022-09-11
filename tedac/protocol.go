@@ -6,6 +6,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/tedacmc/tedac/tedac/legacymappings"
 	legacypacket2 "github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
 	_ "github.com/tedacmc/tedac/tedac/raknet"
 )
@@ -59,7 +60,6 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 
 // ConvertFromLatest ...
 func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
-	fmt.Printf("1.19 -> 1.12: %T\n", pk)
 	switch pk := pk.(type) {
 	case *packet.MovePlayer:
 		return []packet.Packet{
@@ -76,10 +76,6 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 			},
 		}
 	case *packet.StartGame:
-		gameRules := make(map[string]any)
-		for _, gr := range pk.GameRules {
-			gameRules[gr.Name] = gr.Value
-		}
 		return []packet.Packet{
 			&legacypacket2.StartGame{
 				EntityUniqueID:                 pk.EntityUniqueID,
@@ -121,14 +117,18 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 				Trial:                          pk.Trial,
 				Time:                           pk.Time,
 				EnchantmentSeed:                pk.EnchantmentSeed,
-				Blocks:                         pk.Blocks,
-				Items:                          pk.Items,
+				Blocks:                         legacymappings.Blocks(),
+				Items:                          legacymappings.Items(),
 				MultiPlayerCorrelationID:       pk.MultiPlayerCorrelationID,
 				GameRules: lo.SliceToMap(pk.GameRules, func(rule protocol.GameRule) (string, any) {
 					return rule.Name, rule.Value
 				}),
 			},
 		}
+	case *packet.AvailableActorIdentifiers, *packet.CraftingData, *packet.UpdateAttributes, *packet.SetActorData, *packet.UpdateAbilities, *packet.UpdateAdventureSettings, *packet.CreativeContent, *packet.LevelChunk:
+		// TODO: Properly handle these!
+		return nil
 	}
+	fmt.Printf("1.19 -> 1.12: %T\n", pk)
 	return []packet.Packet{pk}
 }
