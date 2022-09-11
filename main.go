@@ -1,12 +1,11 @@
-package tedac_test
+package main
 
 import (
 	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/tedacmc/tedac"
-	"testing"
+	"github.com/tedacmc/tedac/tedac"
 )
 
-func TestListen(t *testing.T) {
+func main() {
 	// Listen on the address with port 19132.
 	listener, err := minecraft.ListenConfig{
 		StatusProvider:    minecraft.NewStatusProvider("Tedac Listen Test"),

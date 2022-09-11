@@ -1,11 +1,12 @@
-package tedac
+package raknet
 
 import (
 	"bytes"
 	"compress/zlib"
 	"fmt"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"io/ioutil"
+
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
 // zLibCompression is an implementation of the zLib compression algorithm.
