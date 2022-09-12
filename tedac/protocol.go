@@ -3,6 +3,7 @@ package tedac
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/samber/lo"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -46,6 +47,7 @@ func (Protocol) Packets() packet.Pool {
 	pool[packet.IDPlayerAction] = func() packet.Packet { return &legacypacket.PlayerAction{} }
 	pool[packet.IDStartGame] = func() packet.Packet { return &legacypacket.StartGame{} }
 	pool[packet.IDText] = func() packet.Packet { return &legacypacket.Text{} }
+	pool[packet.IDModalFormResponse] = func() packet.Packet { return &legacypacket.ModalFormResponse{} }
 	return pool
 }
 
@@ -56,7 +58,7 @@ func (Protocol) Encryption(key [32]byte) packet.Encryption {
 
 // ConvertToLatest ...
 func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
-	fmt.Printf("1.12 -> 1.19: %T\n", pk)
+	// fmt.Printf("1.12 -> 1.19: %T\n", pk)
 	switch pk := pk.(type) {
 	case *legacypacket.MovePlayer:
 		return []packet.Packet{
@@ -79,6 +81,14 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				ActionType:      pk.ActionType,
 				BlockPosition:   pk.BlockPosition,
 				BlockFace:       pk.BlockFace,
+			},
+		}
+	case *legacypacket.ModalFormResponse:
+		return []packet.Packet{
+			&packet.ModalFormResponse{
+				FormID:       pk.FormID,
+				ResponseData: protocol.Option(pk.ResponseData),
+				CancelReason: protocol.Option[uint8](packet.ModalFormCancelReasonUserClosed), // idfk man im not payed enough
 			},
 		}
 	}
@@ -181,9 +191,9 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				TeleportCause:         pk.TeleportCause,
 			},
 		}
-	case *packet.PlayerList, *packet.MobEquipment, *packet.InventoryContent, *packet.InventorySlot, *packet.CraftingData, *packet.UpdateAttributes, *packet.UpdateAbilities, *packet.UpdateAdventureSettings, *packet.CreativeContent:
-		// TODO: Properly handle these!
-		return nil
+	// case *packet.PlayerList, *packet.MobEquipment, *packet.InventoryContent, *packet.InventorySlot, *packet.CraftingData, *packet.UpdateAttributes, *packet.UpdateAbilities, *packet.UpdateAdventureSettings, *packet.CreativeContent:
+	// 	// TODO: Properly handle these!
+	// 	return nil
 	case *packet.ActorPickRequest:
 		return []packet.Packet{
 			&legacypacket.ActorPickRequest{
@@ -267,8 +277,67 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				WindowID: pk.WindowID,
 			},
 		}
+	case *packet.PlayerList:
+		entries := []legacypacket.PlayerListEntry{}
+		for _, entry := range pk.Entries {
+			entries = append(entries, legacypacket.PlayerListEntry{
+				UUID:           entry.UUID,
+				EntityUniqueID: entry.EntityUniqueID,
+				Username:       entry.Username,
+				SkinID:         entry.Skin.SkinID,
+				SkinData:       entry.Skin.SkinData,
+				CapeData:       entry.Skin.CapeData,
+				// SkinGeometryName: ???
+				SkinGeometry:   entry.Skin.SkinGeometry,
+				PlatformChatID: entry.PlatformChatID,
+				XUID:           entry.XUID,
+			})
+		}
+		return []packet.Packet{
+			&legacypacket.PlayerList{
+				ActionType: pk.ActionType,
+				Entries:    entries,
+			},
+		}
+	case *packet.UpdateAttributes:
+		var attributes []legacyprotocol.Attribute
+		for _, a := range pk.Attributes {
+			attributes = append(attributes, legacyprotocol.Attribute{
+				Name:  a.Name,
+				Value: a.Value,
+				Max:   a.Max,
+				Min:   a.Min,
+			})
+		}
+		return []packet.Packet{
+			&legacypacket.UpdateAttributes{
+				EntityRuntimeID: pk.EntityRuntimeID,
+				Attributes:      attributes,
+			},
+		}
+	case *packet.SetActorData:
+		return []packet.Packet{
+			&legacypacket.SetActorData{
+				EntityRuntimeID: pk.EntityRuntimeID,
+				EntityMetadata:  pk.EntityMetadata,
+			},
+		}
+	case *packet.PlayerSkin:
+		return []packet.Packet{
+			&legacypacket.PlayerSkin{
+				UUID:        pk.UUID,
+				SkinID:      pk.Skin.SkinID,
+				NewSkinName: pk.NewSkinName,
+				OldSkinName: pk.OldSkinName,
+				SkinData:    pk.Skin.SkinData,
+				CapeData:    pk.Skin.CapeData,
+				// SkinGeometryName: ??,
+				SkinGeometry: pk.Skin.SkinGeometry,
+				PremiumSkin:  pk.Skin.PremiumSkin,
+			},
+		}
 	}
-	fmt.Printf("1.19 -> 1.12: %T\n", pk)
+	//fmt.Printf("1.19 -> 1.12: %T\n", pk)
 	return []packet.Packet{pk}
 }
 
