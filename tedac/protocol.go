@@ -2,11 +2,13 @@ package tedac
 
 import (
 	"fmt"
+
 	"github.com/samber/lo"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/tedacmc/tedac/tedac/legacymappings"
+	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 	legacypacket2 "github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
 	_ "github.com/tedacmc/tedac/tedac/raknet"
 )
@@ -52,6 +54,15 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				OnGround:              pk.OnGround,
 				RiddenEntityRuntimeID: pk.RiddenEntityRuntimeID,
 				TeleportCause:         pk.TeleportCause,
+			},
+		}
+	case *legacypacket2.PlayerAction:
+		return []packet.Packet{
+			&packet.PlayerAction{
+				EntityRuntimeID: pk.EntityRuntimeID,
+				ActionType:      pk.ActionType,
+				BlockPosition:   pk.BlockPosition,
+				BlockFace:       pk.BlockFace,
 			},
 		}
 	}
@@ -125,9 +136,92 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 				}),
 			},
 		}
-	case *packet.AvailableActorIdentifiers, *packet.CraftingData, *packet.UpdateAttributes, *packet.SetActorData, *packet.UpdateAbilities, *packet.UpdateAdventureSettings, *packet.CreativeContent, *packet.LevelChunk:
-		// TODO: Properly handle these!
-		return nil
+	// case *packet.AvailableActorIdentifiers, *packet.CraftingData, *packet.UpdateAttributes, *packet.SetActorData, *packet.UpdateAbilities, *packet.UpdateAdventureSettings, *packet.CreativeContent, *packet.LevelChunk:
+	// 	// TODO: Properly handle these!
+	// 	return nil
+	case *packet.ActorPickRequest:
+		return []packet.Packet{
+			&legacypacket2.ActorPickRequest{
+				EntityUniqueID: pk.EntityUniqueID,
+				HotBarSlot:     pk.HotBarSlot,
+			},
+		}
+	case *packet.AddActor:
+		attributes := []legacyprotocol.Attribute{}
+		for _, a := range pk.Attributes {
+			attributes = append(attributes, legacyprotocol.Attribute{
+				Name:  a.Name,
+				Value: a.Value,
+				Max:   a.Max,
+				Min:   a.Min,
+			})
+		}
+		links := []legacyprotocol.EntityLink{}
+		for _, l := range pk.EntityLinks {
+			links = append(links, legacyprotocol.EntityLink{
+				RiddenEntityUniqueID: l.RiddenEntityUniqueID,
+				RiderEntityUniqueID:  l.RiddenEntityUniqueID,
+				Type:                 l.Type,
+				Immediate:            l.Immediate,
+			})
+		}
+		return []packet.Packet{
+			&legacypacket2.AddActor{
+				EntityUniqueID:  pk.EntityUniqueID,
+				EntityRuntimeID: pk.EntityRuntimeID,
+				EntityType:      pk.EntityType,
+				Position:        pk.Position,
+				Velocity:        pk.Velocity,
+				Pitch:           pk.Pitch,
+				Yaw:             pk.Yaw,
+				HeadYaw:         pk.HeadYaw,
+				Attributes:      attributes,
+				EntityMetadata:  pk.EntityMetadata,
+				EntityLinks:     links,
+			},
+		}
+	case *packet.AddPlayer:
+		links := []legacyprotocol.EntityLink{}
+		for _, l := range pk.EntityLinks {
+			links = append(links, legacyprotocol.EntityLink{
+				RiddenEntityUniqueID: l.RiddenEntityUniqueID,
+				RiderEntityUniqueID:  l.RiddenEntityUniqueID,
+				Type:                 l.Type,
+				Immediate:            l.Immediate,
+			})
+		}
+		return []packet.Packet{
+			&legacypacket2.AddPlayer{
+				UUID:            pk.UUID,
+				Username:        pk.Username,
+				EntityUniqueID:  pk.EntityUniqueID,
+				EntityRuntimeID: pk.EntityRuntimeID,
+				PlatformChatID:  pk.PlatformChatID,
+				Position:        pk.Position,
+				Velocity:        pk.Velocity,
+				Pitch:           pk.Pitch,
+				Yaw:             pk.Yaw,
+				HeadYaw:         pk.HeadYaw,
+				// HeldItem: pk.HeldItem, ???
+				EntityMetadata:         pk.EntityMetadata,
+				CommandPermissionLevel: uint32(pk.CommandPermissions),
+				PermissionLevel:        uint32(pk.PlayerPermissions),
+				EntityLinks:            links,
+				DeviceID:               pk.DeviceID,
+			},
+		}
+	case *packet.AvailableActorIdentifiers:
+		pk.SerialisedEntityIdentifiers = []byte(legacypacket2.AaiNiggerHardcode)
+		return []packet.Packet{pk}
+	case *packet.BiomeDefinitionList:
+		pk.SerialisedBiomeDefinitions = []byte(legacypacket2.BdlNiggerHardcode)
+		return []packet.Packet{pk}
+	case *packet.ContainerClose:
+		return []packet.Packet{
+			&legacypacket2.ContainerClose{
+				WindowID: pk.WindowID,
+			},
+		}
 	}
 	fmt.Printf("1.19 -> 1.12: %T\n", pk)
 	return []packet.Packet{pk}
