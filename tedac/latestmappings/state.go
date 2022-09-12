@@ -66,6 +66,9 @@ func init() {
 
 // StateToRuntimeID converts a name and its state properties to a runtime ID.
 func StateToRuntimeID(name string, properties map[string]any) (runtimeID uint32, found bool) {
+	if updated, ok := UpdatedNameFromAlias(name); ok {
+		name = updated
+	}
 	rid, ok := stateRuntimeIDs[HashState(State{Name: name, Properties: properties})]
 	return rid, ok
 }

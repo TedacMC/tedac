@@ -36,6 +36,10 @@ func init() {
 
 	for latestRID, meta := range blockStateMetas {
 		name, properties, _ := latestmappings.RuntimeIDToState(uint32(latestRID))
+		if alias, ok := latestmappings.AliasFromUpdatedName(name); ok {
+			name = alias
+		}
+
 		legacyID, ok := legacyIDs[name]
 		if !ok {
 			// This block didn't exist in v1.12.0.
@@ -57,6 +61,9 @@ func init() {
 
 // StateToRuntimeID converts a name and its state properties to a runtime ID.
 func StateToRuntimeID(name string, properties map[string]any) (runtimeID uint32, found bool) {
+	if alias, ok := latestmappings.AliasFromUpdatedName(name); ok {
+		name = alias
+	}
 	rid, ok := stateToRuntimeID[latestmappings.HashState(latestmappings.State{Name: name, Properties: properties})]
 	if !ok {
 		rid, ok = stateToRuntimeID[latestmappings.HashState(latestmappings.State{Name: "minecraft:info_update"})]

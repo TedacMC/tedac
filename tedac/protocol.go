@@ -56,7 +56,7 @@ func (Protocol) Encryption(key [32]byte) packet.Encryption {
 
 // ConvertToLatest ...
 func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
-	//fmt.Printf("1.12 -> 1.19: %T\n", pk)
+	fmt.Printf("1.12 -> 1.19: %T\n", pk)
 	switch pk := pk.(type) {
 	case *legacypacket.MovePlayer:
 		return []packet.Packet{
@@ -86,7 +86,7 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 }
 
 // ConvertFromLatest ...
-func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
+func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []packet.Packet {
 	switch pk := pk.(type) {
 	case *packet.StartGame:
 		return []packet.Packet{
@@ -145,13 +145,14 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 		}
 
 		buf := bytes.NewBuffer(pk.RawPayload)
-		c, err := chunk.NetworkDecode(latestAirRID, buf, int(pk.SubChunkCount), world.Overworld.Range())
+		oldFormat := conn.GameData().BaseGameVersion == "1.17.40"
+		c, err := chunk.NetworkDecode(latestAirRID, buf, int(pk.SubChunkCount), oldFormat, world.Overworld.Range())
 		if err != nil {
 			fmt.Println(err)
 			return nil
 		}
 
-		writeBuf, data := bytes.NewBuffer(nil), legacychunk.Encode(downgradeChunk(c), legacychunk.NetworkEncoding)
+		writeBuf, data := bytes.NewBuffer(nil), legacychunk.Encode(downgradeChunk(c, oldFormat), legacychunk.NetworkEncoding)
 		for i := range data.SubChunks {
 			_, _ = writeBuf.Write(data.SubChunks[i])
 		}
@@ -180,7 +181,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 				TeleportCause:         pk.TeleportCause,
 			},
 		}
-	case *packet.PlayerList, *packet.MobEquipment, *packet.InventoryContent, *packet.InventorySlot, *packet.CraftingData, *packet.UpdateAttributes, *packet.SetActorData, *packet.UpdateAbilities, *packet.UpdateAdventureSettings, *packet.CreativeContent:
+	case *packet.PlayerList, *packet.MobEquipment, *packet.InventoryContent, *packet.InventorySlot, *packet.CraftingData, *packet.UpdateAttributes, *packet.UpdateAbilities, *packet.UpdateAdventureSettings, *packet.CreativeContent:
 		// TODO: Properly handle these!
 		return nil
 	case *packet.ActorPickRequest:
@@ -279,10 +280,17 @@ var (
 )
 
 // downgradeChunk downgrades a chunk from the latest version to the v1.12.0 equivalent.
-func downgradeChunk(chunk *chunk.Chunk) *legacychunk.Chunk {
+func downgradeChunk(chunk *chunk.Chunk, oldFormat bool) *legacychunk.Chunk {
 	// First downgrade the blocks.
+	subs := chunk.Sub()
+	if oldFormat {
+		subs = subs[:len(subs)-4]
+	} else {
+		subs = subs[4 : len(subs)-4]
+	}
+
 	downgraded := legacychunk.New(legacyAirRID)
-	for subInd, sub := range chunk.Sub()[4 : len(chunk.Sub())-4] {
+	for subInd, sub := range subs {
 		for layerInd, layer := range sub.Layers() {
 			downgradedLayer := downgraded.Sub()[subInd].Layer(uint8(layerInd))
 			for x := uint8(0); x < 16; x++ {

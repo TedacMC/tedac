@@ -64,9 +64,10 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 	b, _ := json.Marshal(clientData)
 	_ = os.WriteFile("client_data.json", b, 0644)
 
+	src := tokenSource()
 	serverConn, err := minecraft.Dialer{
-		IdentityData: conn.IdentityData(),
-		ClientData:   clientData,
+		TokenSource: src,
+		ClientData:  clientData,
 	}.Dial("raknet", config.Connection.RemoteAddress)
 	if err != nil {
 		panic(err)
