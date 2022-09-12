@@ -2,6 +2,7 @@ package tedac
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 
 	"github.com/df-mc/dragonfly/server/world"
@@ -43,11 +44,15 @@ func (Protocol) Packets() packet.Pool {
 	pool[packet.IDContainerClose] = func() packet.Packet { return &legacypacket.ContainerClose{} }
 	//pool[packet.IDCraftingData] = func() packet.Packet { return &legacypacket.CraftingData{} }
 	pool[packet.IDLevelChunk] = func() packet.Packet { return &legacypacket.LevelChunk{} }
+	pool[packet.IDModalFormResponse] = func() packet.Packet { return &legacypacket.ModalFormResponse{} }
 	pool[packet.IDMovePlayer] = func() packet.Packet { return &legacypacket.MovePlayer{} }
 	pool[packet.IDPlayerAction] = func() packet.Packet { return &legacypacket.PlayerAction{} }
+	pool[packet.IDPlayerList] = func() packet.Packet { return &legacypacket.PlayerList{} }
+	pool[packet.IDPlayerSkin] = func() packet.Packet { return &legacypacket.PlayerSkin{} }
+	pool[packet.IDSetActorData] = func() packet.Packet { return &legacypacket.SetActorData{} }
 	pool[packet.IDStartGame] = func() packet.Packet { return &legacypacket.StartGame{} }
 	pool[packet.IDText] = func() packet.Packet { return &legacypacket.Text{} }
-	pool[packet.IDModalFormResponse] = func() packet.Packet { return &legacypacket.ModalFormResponse{} }
+	pool[packet.IDUpdateAttributes] = func() packet.Packet { return &legacypacket.UpdateAttributes{} }
 	return pool
 }
 
@@ -191,9 +196,6 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				TeleportCause:         pk.TeleportCause,
 			},
 		}
-	// case *packet.PlayerList, *packet.MobEquipment, *packet.InventoryContent, *packet.InventorySlot, *packet.CraftingData, *packet.UpdateAttributes, *packet.UpdateAbilities, *packet.UpdateAdventureSettings, *packet.CreativeContent:
-	// 	// TODO: Properly handle these!
-	// 	return nil
 	case *packet.ActorPickRequest:
 		return []packet.Packet{
 			&legacypacket.ActorPickRequest{
@@ -278,19 +280,29 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			},
 		}
 	case *packet.PlayerList:
-		entries := []legacypacket.PlayerListEntry{}
+		var entries []legacypacket.PlayerListEntry
 		for _, entry := range pk.Entries {
+			var patch struct {
+				Geometry struct {
+					Default string
+				}
+			}
+			err := json.Unmarshal(entry.Skin.SkinResourcePatch, &patch)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
 			entries = append(entries, legacypacket.PlayerListEntry{
-				UUID:           entry.UUID,
-				EntityUniqueID: entry.EntityUniqueID,
-				Username:       entry.Username,
-				SkinID:         entry.Skin.SkinID,
-				SkinData:       entry.Skin.SkinData,
-				CapeData:       entry.Skin.CapeData,
-				// SkinGeometryName: ???
-				SkinGeometry:   entry.Skin.SkinGeometry,
-				PlatformChatID: entry.PlatformChatID,
-				XUID:           entry.XUID,
+				UUID:             entry.UUID,
+				EntityUniqueID:   entry.EntityUniqueID,
+				Username:         entry.Username,
+				SkinID:           entry.Skin.SkinID,
+				SkinData:         entry.Skin.SkinData,
+				CapeData:         entry.Skin.CapeData,
+				SkinGeometryName: patch.Geometry.Default,
+				SkinGeometry:     entry.Skin.SkinGeometry,
+				PlatformChatID:   entry.PlatformChatID,
+				XUID:             entry.XUID,
 			})
 		}
 		return []packet.Packet{
@@ -323,17 +335,27 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			},
 		}
 	case *packet.PlayerSkin:
+		var patch struct {
+			Geometry struct {
+				Default string
+			}
+		}
+		err := json.Unmarshal(pk.Skin.SkinResourcePatch, &patch)
+		if err != nil {
+			fmt.Println(err)
+			return nil
+		}
 		return []packet.Packet{
 			&legacypacket.PlayerSkin{
-				UUID:        pk.UUID,
-				SkinID:      pk.Skin.SkinID,
-				NewSkinName: pk.NewSkinName,
-				OldSkinName: pk.OldSkinName,
-				SkinData:    pk.Skin.SkinData,
-				CapeData:    pk.Skin.CapeData,
-				// SkinGeometryName: ??,
-				SkinGeometry: pk.Skin.SkinGeometry,
-				PremiumSkin:  pk.Skin.PremiumSkin,
+				UUID:             pk.UUID,
+				SkinID:           pk.Skin.SkinID,
+				NewSkinName:      pk.NewSkinName,
+				OldSkinName:      pk.OldSkinName,
+				SkinData:         pk.Skin.SkinData,
+				CapeData:         pk.Skin.CapeData,
+				SkinGeometryName: patch.Geometry.Default,
+				SkinGeometry:     pk.Skin.SkinGeometry,
+				PremiumSkin:      pk.Skin.PremiumSkin,
 			},
 		}
 	}
