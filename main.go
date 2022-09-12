@@ -4,14 +4,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/pelletier/go-toml"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/tedacmc/tedac/tedac"
 	"io/ioutil"
 	"log"
 	"os"
 	"sync"
-
-	"github.com/pelletier/go-toml"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/tedacmc/tedac/tedac"
 
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
@@ -21,7 +20,6 @@ import (
 // The following program implements a proxy that forwards players from one local address to a remote address.
 func main() {
 	conf := readConfig()
-	src := tokenSource()
 
 	p, err := minecraft.NewForeignStatusProvider(conf.Connection.RemoteAddress)
 	if err != nil {
@@ -40,7 +38,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		go handleConn(c.(*minecraft.Conn), listener, conf, src)
+		go handleConn(c.(*minecraft.Conn), listener, conf)
 	}
 }
 
@@ -53,7 +51,7 @@ const defaultSkinResourcePatch = `{
 `
 
 // handleConn handles a new incoming minecraft.Conn from the minecraft.Listener passed.
-func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config config, src oauth2.TokenSource) {
+func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config config) {
 	clientData := conn.ClientData()
 	if _, ok := conn.Protocol().(tedac.Protocol); ok {
 		clientData.GameVersion = protocol.CurrentVersion
@@ -67,8 +65,8 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 	_ = os.WriteFile("client_data.json", b, 0644)
 
 	serverConn, err := minecraft.Dialer{
-		TokenSource: src,
-		ClientData:  clientData,
+		IdentityData: conn.IdentityData(),
+		ClientData:   clientData,
 	}.Dial("raknet", config.Connection.RemoteAddress)
 	if err != nil {
 		panic(err)

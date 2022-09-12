@@ -1,15 +1,19 @@
 package tedac
 
 import (
+	"bytes"
 	"fmt"
-
+	"github.com/df-mc/dragonfly/server/world"
 	"github.com/samber/lo"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/tedacmc/tedac/tedac/chunk"
+	"github.com/tedacmc/tedac/tedac/latestmappings"
+	"github.com/tedacmc/tedac/tedac/legacychunk"
 	"github.com/tedacmc/tedac/tedac/legacymappings"
 	"github.com/tedacmc/tedac/tedac/legacyprotocol"
-	legacypacket2 "github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
+	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
 	_ "github.com/tedacmc/tedac/tedac/raknet"
 )
 
@@ -23,14 +27,26 @@ func (Protocol) ID() int32 {
 
 // Ver ...
 func (Protocol) Ver() string {
-	return "1.12.0"
+	return "1.12.1"
 }
 
 // Packets ...
 func (Protocol) Packets() packet.Pool {
-	p := packet.NewPool()
-	p[packet.IDMovePlayer] = func() packet.Packet { return &legacypacket2.MovePlayer{} }
-	return packet.NewPool()
+	pool := packet.NewPool()
+	pool[packet.IDActorPickRequest] = func() packet.Packet { return &legacypacket.ActorPickRequest{} }
+	pool[packet.IDAddActor] = func() packet.Packet { return &legacypacket.AddActor{} }
+	pool[packet.IDAddPlayer] = func() packet.Packet { return &legacypacket.AddPlayer{} }
+	pool[packet.IDAvailableActorIdentifiers] = func() packet.Packet { return &legacypacket.AvailableActorIdentifiers{} }
+	//pool[packet.IDAvailableCommands] = func() packet.Packet { return &legacypacket.AvailableCommands{} }
+	pool[packet.IDBiomeDefinitionList] = func() packet.Packet { return &legacypacket.BiomeDefinitionList{} }
+	pool[packet.IDContainerClose] = func() packet.Packet { return &legacypacket.ContainerClose{} }
+	//pool[packet.IDCraftingData] = func() packet.Packet { return &legacypacket.CraftingData{} }
+	pool[packet.IDLevelChunk] = func() packet.Packet { return &legacypacket.LevelChunk{} }
+	pool[packet.IDMovePlayer] = func() packet.Packet { return &legacypacket.MovePlayer{} }
+	pool[packet.IDPlayerAction] = func() packet.Packet { return &legacypacket.PlayerAction{} }
+	pool[packet.IDStartGame] = func() packet.Packet { return &legacypacket.StartGame{} }
+	pool[packet.IDText] = func() packet.Packet { return &legacypacket.Text{} }
+	return pool
 }
 
 // Encryption ...
@@ -40,9 +56,9 @@ func (Protocol) Encryption(key [32]byte) packet.Encryption {
 
 // ConvertToLatest ...
 func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
-	fmt.Printf("1.12 -> 1.19: %T\n", pk)
+	//fmt.Printf("1.12 -> 1.19: %T\n", pk)
 	switch pk := pk.(type) {
-	case *legacypacket2.MovePlayer:
+	case *legacypacket.MovePlayer:
 		return []packet.Packet{
 			&packet.MovePlayer{
 				EntityRuntimeID:       pk.EntityRuntimeID,
@@ -56,7 +72,7 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				TeleportCause:         pk.TeleportCause,
 			},
 		}
-	case *legacypacket2.PlayerAction:
+	case *legacypacket.PlayerAction:
 		return []packet.Packet{
 			&packet.PlayerAction{
 				EntityRuntimeID: pk.EntityRuntimeID,
@@ -72,23 +88,9 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 // ConvertFromLatest ...
 func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
 	switch pk := pk.(type) {
-	case *packet.MovePlayer:
-		return []packet.Packet{
-			&legacypacket2.MovePlayer{
-				EntityRuntimeID:       pk.EntityRuntimeID,
-				Position:              pk.Position,
-				Pitch:                 pk.Pitch,
-				Yaw:                   pk.Yaw,
-				HeadYaw:               pk.HeadYaw,
-				Mode:                  pk.Mode,
-				OnGround:              pk.OnGround,
-				RiddenEntityRuntimeID: pk.RiddenEntityRuntimeID,
-				TeleportCause:         pk.TeleportCause,
-			},
-		}
 	case *packet.StartGame:
 		return []packet.Packet{
-			&legacypacket2.StartGame{
+			&legacypacket.StartGame{
 				EntityUniqueID:                 pk.EntityUniqueID,
 				EntityRuntimeID:                pk.EntityRuntimeID,
 				PlayerGameMode:                 pk.PlayerGameMode,
@@ -136,18 +138,60 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 				}),
 			},
 		}
-	// case *packet.AvailableActorIdentifiers, *packet.CraftingData, *packet.UpdateAttributes, *packet.SetActorData, *packet.UpdateAbilities, *packet.UpdateAdventureSettings, *packet.CreativeContent, *packet.LevelChunk:
-	// 	// TODO: Properly handle these!
-	// 	return nil
+	case *packet.LevelChunk:
+		if pk.SubChunkRequestMode != protocol.SubChunkRequestModeLegacy {
+			// TODO: Support other sub-chunk request modes.
+			return nil
+		}
+
+		buf := bytes.NewBuffer(pk.RawPayload)
+		c, err := chunk.NetworkDecode(latestAirRID, buf, int(pk.SubChunkCount), world.Overworld.Range())
+		if err != nil {
+			fmt.Println(err)
+			return nil
+		}
+
+		writeBuf, data := bytes.NewBuffer(nil), legacychunk.Encode(downgradeChunk(c), legacychunk.NetworkEncoding)
+		for i := range data.SubChunks {
+			_, _ = writeBuf.Write(data.SubChunks[i])
+		}
+		_, _ = writeBuf.Write(data.Data2D)
+
+		return []packet.Packet{
+			&legacypacket.LevelChunk{
+				BlobHashes:    pk.BlobHashes,
+				CacheEnabled:  pk.CacheEnabled,
+				Position:      pk.Position,
+				RawPayload:    append(writeBuf.Bytes(), buf.Bytes()...),
+				SubChunkCount: uint32(len(data.SubChunks)),
+			},
+		}
+	case *packet.MovePlayer:
+		return []packet.Packet{
+			&legacypacket.MovePlayer{
+				EntityRuntimeID:       pk.EntityRuntimeID,
+				Position:              pk.Position,
+				Pitch:                 pk.Pitch,
+				Yaw:                   pk.Yaw,
+				HeadYaw:               pk.HeadYaw,
+				Mode:                  pk.Mode,
+				OnGround:              pk.OnGround,
+				RiddenEntityRuntimeID: pk.RiddenEntityRuntimeID,
+				TeleportCause:         pk.TeleportCause,
+			},
+		}
+	case *packet.PlayerList, *packet.MobEquipment, *packet.InventoryContent, *packet.InventorySlot, *packet.CraftingData, *packet.UpdateAttributes, *packet.SetActorData, *packet.UpdateAbilities, *packet.UpdateAdventureSettings, *packet.CreativeContent:
+		// TODO: Properly handle these!
+		return nil
 	case *packet.ActorPickRequest:
 		return []packet.Packet{
-			&legacypacket2.ActorPickRequest{
+			&legacypacket.ActorPickRequest{
 				EntityUniqueID: pk.EntityUniqueID,
 				HotBarSlot:     pk.HotBarSlot,
 			},
 		}
 	case *packet.AddActor:
-		attributes := []legacyprotocol.Attribute{}
+		var attributes []legacyprotocol.Attribute
 		for _, a := range pk.Attributes {
 			attributes = append(attributes, legacyprotocol.Attribute{
 				Name:  a.Name,
@@ -156,7 +200,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 				Min:   a.Min,
 			})
 		}
-		links := []legacyprotocol.EntityLink{}
+		var links []legacyprotocol.EntityLink
 		for _, l := range pk.EntityLinks {
 			links = append(links, legacyprotocol.EntityLink{
 				RiddenEntityUniqueID: l.RiddenEntityUniqueID,
@@ -166,22 +210,22 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 			})
 		}
 		return []packet.Packet{
-			&legacypacket2.AddActor{
-				EntityUniqueID:  pk.EntityUniqueID,
+			&legacypacket.AddActor{
+				Attributes:      attributes,
+				EntityLinks:     links,
+				EntityMetadata:  pk.EntityMetadata,
 				EntityRuntimeID: pk.EntityRuntimeID,
 				EntityType:      pk.EntityType,
+				EntityUniqueID:  pk.EntityUniqueID,
+				HeadYaw:         pk.HeadYaw,
+				Pitch:           pk.Pitch,
 				Position:        pk.Position,
 				Velocity:        pk.Velocity,
-				Pitch:           pk.Pitch,
 				Yaw:             pk.Yaw,
-				HeadYaw:         pk.HeadYaw,
-				Attributes:      attributes,
-				EntityMetadata:  pk.EntityMetadata,
-				EntityLinks:     links,
 			},
 		}
 	case *packet.AddPlayer:
-		links := []legacyprotocol.EntityLink{}
+		var links []legacyprotocol.EntityLink
 		for _, l := range pk.EntityLinks {
 			links = append(links, legacyprotocol.EntityLink{
 				RiddenEntityUniqueID: l.RiddenEntityUniqueID,
@@ -191,7 +235,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 			})
 		}
 		return []packet.Packet{
-			&legacypacket2.AddPlayer{
+			&legacypacket.AddPlayer{
 				UUID:            pk.UUID,
 				Username:        pk.Username,
 				EntityUniqueID:  pk.EntityUniqueID,
@@ -211,18 +255,69 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, _ *minecraft.Conn) []packet.
 			},
 		}
 	case *packet.AvailableActorIdentifiers:
-		pk.SerialisedEntityIdentifiers = []byte(legacypacket2.AaiNiggerHardcode)
+		pk.SerialisedEntityIdentifiers = []byte(legacypacket.AaiNiggerHardcode)
 		return []packet.Packet{pk}
 	case *packet.BiomeDefinitionList:
-		pk.SerialisedBiomeDefinitions = []byte(legacypacket2.BdlNiggerHardcode)
+		pk.SerialisedBiomeDefinitions = []byte(legacypacket.BdlNiggerHardcode)
 		return []packet.Packet{pk}
 	case *packet.ContainerClose:
 		return []packet.Packet{
-			&legacypacket2.ContainerClose{
+			&legacypacket.ContainerClose{
 				WindowID: pk.WindowID,
 			},
 		}
 	}
 	fmt.Printf("1.19 -> 1.12: %T\n", pk)
 	return []packet.Packet{pk}
+}
+
+var (
+	// latestAirRID is the runtime ID of the air block in the latest version of the game.
+	latestAirRID, _ = latestmappings.StateToRuntimeID("minecraft:air", nil)
+	// legacyAirRID is the runtime ID of the air block in the v1.12.0 version.
+	legacyAirRID, _ = legacymappings.StateToRuntimeID("minecraft:air", nil)
+)
+
+// downgradeChunk downgrades a chunk from the latest version to the v1.12.0 equivalent.
+func downgradeChunk(chunk *chunk.Chunk) *legacychunk.Chunk {
+	// First downgrade the blocks.
+	downgraded := legacychunk.New(legacyAirRID)
+	for subInd, sub := range chunk.Sub()[4 : len(chunk.Sub())-4] {
+		for layerInd, layer := range sub.Layers() {
+			downgradedLayer := downgraded.Sub()[subInd].Layer(uint8(layerInd))
+			for x := uint8(0); x < 16; x++ {
+				for z := uint8(0); z < 16; z++ {
+					for y := uint8(0); y < 16; y++ {
+						latestRuntimeID := layer.At(x, y, z)
+						if latestRuntimeID == latestAirRID {
+							// Don't bother with air.
+							continue
+						}
+
+						name, properties, ok := latestmappings.RuntimeIDToState(latestRuntimeID)
+						if !ok {
+							// Unknown runtime ID, ignore this position.
+							continue
+						}
+						rid, ok := legacymappings.StateToRuntimeID(name, properties)
+						if !ok {
+							// Unknown state, ignore this position.
+							continue
+						}
+
+						downgradedLayer.SetRuntimeID(x, y, z, rid)
+					}
+				}
+			}
+		}
+	}
+
+	// Then downgrade the biomes.
+	for x := uint8(0); x < 16; x++ {
+		for z := uint8(0); z < 16; z++ {
+			// Use the highest block as an estimate for the biome, since we only have 2D biomes.
+			downgraded.SetBiomeID(x, z, uint8(chunk.Biome(x, chunk.HighestBlock(x, z), z)))
+		}
+	}
+	return downgraded
 }

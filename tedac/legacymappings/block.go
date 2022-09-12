@@ -3,22 +3,23 @@ package legacymappings
 import (
 	_ "embed"
 	"encoding/json"
-	"fmt"
+	"github.com/tedacmc/tedac/tedac/latestmappings"
 	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 )
 
 var (
 	//go:embed block_id_map.json
 	blockIDData []byte
-	//go:embed required_block_states.json
-	requiredBlockData []byte
+	//go:embed block_state_meta_map.json
+	blockStateMetaData []byte
 
 	// blocks holds a list of all existing v in the game.
 	blocks []legacyprotocol.BlockEntry
-	// legacyToRuntimeIDs maps a legacy block ID to a runtime ID.
-	legacyToRuntimeIDs = map[int16]int32{}
-	// runtimeToLegacyIDs maps a runtime ID to a legacy block ID.
-	runtimeToLegacyIDs = map[int32]int16{}
+
+	// stateToRuntimeID maps a block state hash to a runtime ID.
+	stateToRuntimeID = map[latestmappings.StateHash]uint32{}
+	// runtimeIDToState maps a runtime ID to a state.
+	runtimeIDToState = map[uint32]latestmappings.State{}
 )
 
 // init reads all block entries from the resource JSON, and sets the according values in the maps.
@@ -28,35 +29,45 @@ func init() {
 		panic(err)
 	}
 
-	var requiredBlockStates map[string]map[string][]int16
-	if err := json.Unmarshal(requiredBlockData, &requiredBlockStates); err != nil {
+	var blockStateMetas []int16
+	if err := json.Unmarshal(blockStateMetaData, &blockStateMetas); err != nil {
 		panic(err)
 	}
 
-	for prefix, entries := range requiredBlockStates {
-		for identifier, states := range entries {
-			name := fmt.Sprintf("%v:%v", prefix, identifier)
-			legacyID := legacyIDs[name]
-			for _, state := range states {
-				blocks = append(blocks, legacyprotocol.BlockEntry{
-					Name:     name,
-					Data:     state,
-					LegacyID: legacyID,
-				})
-			}
-		}
-	}
-
-	for runtimeID, entry := range blocks {
-		if entry.Data > 15 {
-			// TODO: Support data values bigger than 4 bits.
+	for latestRID, meta := range blockStateMetas {
+		name, properties, _ := latestmappings.RuntimeIDToState(uint32(latestRID))
+		legacyID, ok := legacyIDs[name]
+		if !ok {
+			// This block didn't exist in v1.12.0.
 			continue
 		}
 
-		ind := (entry.LegacyID << 4) | entry.Data
-		legacyToRuntimeIDs[ind] = int32(runtimeID)
-		runtimeToLegacyIDs[int32(runtimeID)] = ind
+		state := latestmappings.State{Name: name, Properties: properties}
+		legacyRID := uint32(len(blocks))
+
+		blocks = append(blocks, legacyprotocol.BlockEntry{
+			Name:     name,
+			Data:     meta,
+			LegacyID: legacyID,
+		})
+		stateToRuntimeID[latestmappings.HashState(state)] = legacyRID
+		runtimeIDToState[legacyRID] = state
 	}
+}
+
+// StateToRuntimeID converts a name and its state properties to a runtime ID.
+func StateToRuntimeID(name string, properties map[string]any) (runtimeID uint32, found bool) {
+	rid, ok := stateToRuntimeID[latestmappings.HashState(latestmappings.State{Name: name, Properties: properties})]
+	if !ok {
+		rid, ok = stateToRuntimeID[latestmappings.HashState(latestmappings.State{Name: "minecraft:info_update"})]
+	}
+	return rid, ok
+}
+
+// RuntimeIDToState converts a runtime ID to a name and its state properties.
+func RuntimeIDToState(runtimeID uint32) (name string, properties map[string]any, found bool) {
+	s := runtimeIDToState[runtimeID]
+	return s.Name, s.Properties, true
 }
 
 // Blocks returns a slice of all block entries.

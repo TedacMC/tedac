@@ -15,7 +15,7 @@ type State struct {
 	// Name is the name of the block.
 	Name string `nbt:"name"`
 	// Properties is a map of properties that define the block's state.
-	Properties map[string]interface{} `nbt:"states"`
+	Properties map[string]any `nbt:"states"`
 	// Version is the version of the block state.
 	Version int32 `nbt:"version"`
 }
@@ -24,7 +24,7 @@ var (
 	//go:embed block_states.nbt
 	blockStateData []byte
 	// stateRuntimeIDs holds a map for looking up the runtime ID of a block by the stateHash it produces.
-	stateRuntimeIDs = map[stateHash]uint32{}
+	stateRuntimeIDs = map[StateHash]uint32{}
 	// runtimeIDToState holds a map for looking up the blockState of a block by its runtime ID.
 	runtimeIDToState = map[uint32]State{}
 )
@@ -59,14 +59,14 @@ func init() {
 			break
 		}
 		rid := uint32(len(stateRuntimeIDs))
-		stateRuntimeIDs[stateHash{name: s.Name, properties: hashProperties(s.Properties)}] = rid
+		stateRuntimeIDs[HashState(s)] = rid
 		runtimeIDToState[rid] = s
 	}
 }
 
 // StateToRuntimeID converts a name and its state properties to a runtime ID.
 func StateToRuntimeID(name string, properties map[string]any) (runtimeID uint32, found bool) {
-	rid, ok := stateRuntimeIDs[stateHash{name: name, properties: hashProperties(properties)}]
+	rid, ok := stateRuntimeIDs[HashState(State{Name: name, Properties: properties})]
 	return rid, ok
 }
 
@@ -88,19 +88,19 @@ func ItemNameToRuntimeID(name string) (runtimeID int32, found bool) {
 	return rid, ok
 }
 
-// stateHash is a struct that may be used as a map key for block states. It contains the name of the block state
+// StateHash is a struct that may be used as a map key for block states. It contains the name of the block state
 // and an encoded version of the properties.
-type stateHash struct {
-	name, properties string
+type StateHash struct {
+	Name, Properties string
 }
 
-// hashProperties produces a hash for the block properties held by the blockState.
-func hashProperties(properties map[string]any) string {
-	if properties == nil {
-		return ""
+// HashState produces a hash for the block properties held by the blockState.
+func HashState(state State) StateHash {
+	if state.Properties == nil {
+		return StateHash{Name: state.Name}
 	}
-	keys := make([]string, 0, len(properties))
-	for k := range properties {
+	keys := make([]string, 0, len(state.Properties))
+	for k := range state.Properties {
 		keys = append(keys, k)
 	}
 	sort.Slice(keys, func(i, j int) bool {
@@ -109,7 +109,7 @@ func hashProperties(properties map[string]any) string {
 
 	var b strings.Builder
 	for _, k := range keys {
-		switch v := properties[k].(type) {
+		switch v := state.Properties[k].(type) {
 		case bool:
 			if v {
 				b.WriteByte(1)
@@ -129,6 +129,5 @@ func hashProperties(properties map[string]any) string {
 			panic(fmt.Sprintf("invalid block property type %T for property %v", v, k))
 		}
 	}
-
-	return b.String()
+	return StateHash{Name: state.Name, Properties: b.String()}
 }
