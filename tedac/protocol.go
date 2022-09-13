@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/samber/lo"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -49,22 +50,33 @@ func (Protocol) Encryption(key [32]byte) packet.Encryption {
 }
 
 // ConvertToLatest ...
-func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
+func (Protocol) ConvertToLatest(pk packet.Packet, conn *minecraft.Conn) []packet.Packet {
 	// fmt.Printf("1.12 -> 1.19: %T\n", pk)
 	switch pk := pk.(type) {
 	case *legacypacket.MovePlayer:
-		return []packet.Packet{
-			&packet.MovePlayer{
-				EntityRuntimeID:       pk.EntityRuntimeID,
-				Position:              pk.Position,
-				Pitch:                 pk.Pitch,
-				Yaw:                   pk.Yaw,
-				HeadYaw:               pk.HeadYaw,
-				Mode:                  pk.Mode,
-				OnGround:              pk.OnGround,
-				RiddenEntityRuntimeID: pk.RiddenEntityRuntimeID,
-				TeleportCause:         pk.TeleportCause,
-			},
+		if conn.GameData().PlayerMovementSettings.MovementType == protocol.PlayerMovementModeServer || conn.GameData().PlayerMovementSettings.MovementType == protocol.PlayerMovementModeServerWithRewind {
+			return []packet.Packet{
+				&packet.PlayerAuthInput{
+					Pitch:    pk.Pitch,
+					Yaw:      pk.Yaw,
+					Position: pk.Position,
+					HeadYaw:  pk.HeadYaw,
+				},
+			}
+		} else {
+			return []packet.Packet{
+				&packet.MovePlayer{
+					EntityRuntimeID:       pk.EntityRuntimeID,
+					Position:              pk.Position,
+					Pitch:                 pk.Pitch,
+					Yaw:                   pk.Yaw,
+					HeadYaw:               pk.HeadYaw,
+					Mode:                  pk.Mode,
+					OnGround:              pk.OnGround,
+					RiddenEntityRuntimeID: pk.RiddenEntityRuntimeID,
+					TeleportCause:         pk.TeleportCause,
+				},
+			}
 		}
 	case *legacypacket.PlayerAction:
 		return []packet.Packet{
