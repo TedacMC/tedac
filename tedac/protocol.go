@@ -38,9 +38,7 @@ func (Protocol) Packets() packet.Pool {
 	pool[packet.IDActorPickRequest] = func() packet.Packet { return &legacypacket.ActorPickRequest{} }
 	pool[packet.IDAddActor] = func() packet.Packet { return &legacypacket.AddActor{} }
 	pool[packet.IDAddPlayer] = func() packet.Packet { return &legacypacket.AddPlayer{} }
-	pool[packet.IDAvailableActorIdentifiers] = func() packet.Packet { return &legacypacket.AvailableActorIdentifiers{} }
 	//pool[packet.IDAvailableCommands] = func() packet.Packet { return &legacypacket.AvailableCommands{} }
-	pool[packet.IDBiomeDefinitionList] = func() packet.Packet { return &legacypacket.BiomeDefinitionList{} }
 	pool[packet.IDContainerClose] = func() packet.Packet { return &legacypacket.ContainerClose{} }
 	//pool[packet.IDCraftingData] = func() packet.Packet { return &legacypacket.CraftingData{} }
 	pool[packet.IDLevelChunk] = func() packet.Packet { return &legacypacket.LevelChunk{} }
@@ -275,12 +273,6 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				DeviceID:               pk.DeviceID,
 			},
 		}
-	case *packet.AvailableActorIdentifiers:
-		pk.SerialisedEntityIdentifiers = []byte(legacypacket.AaiNiggerHardcode)
-		return []packet.Packet{pk}
-	case *packet.BiomeDefinitionList:
-		pk.SerialisedBiomeDefinitions = []byte(legacypacket.BdlNiggerHardcode)
-		return []packet.Packet{pk}
 	case *packet.ContainerClose:
 		return []packet.Packet{
 			&legacypacket.ContainerClose{
@@ -384,7 +376,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				EntityMetadata:  pk.EntityMetadata,
 			},
 		}
-	case *packet.Animate, *packet.BlockActorData, *packet.CreativeContent, *packet.AvailableCommands, *packet.ItemComponent, *packet.InventoryContent, *packet.InventorySlot:
+	case *packet.CreativeContent, *packet.AvailableCommands, *packet.ItemComponent, *packet.InventoryContent, *packet.InventorySlot:
 		return nil
 	case *packet.PlayerSkin:
 		var patch struct {
