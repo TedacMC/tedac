@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/samber/lo"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -35,23 +34,12 @@ func (Protocol) Ver() string {
 // Packets ...
 func (Protocol) Packets() packet.Pool {
 	pool := packet.NewPool()
-	pool[packet.IDActorPickRequest] = func() packet.Packet { return &legacypacket.ActorPickRequest{} }
-	pool[packet.IDAddActor] = func() packet.Packet { return &legacypacket.AddActor{} }
-	pool[packet.IDAddPlayer] = func() packet.Packet { return &legacypacket.AddPlayer{} }
-	//pool[packet.IDAvailableCommands] = func() packet.Packet { return &legacypacket.AvailableCommands{} }
 	pool[packet.IDContainerClose] = func() packet.Packet { return &legacypacket.ContainerClose{} }
-	//pool[packet.IDCraftingData] = func() packet.Packet { return &legacypacket.CraftingData{} }
-	pool[packet.IDLevelChunk] = func() packet.Packet { return &legacypacket.LevelChunk{} }
+	pool[packet.IDInventoryTransaction] = func() packet.Packet { return &legacypacket.InventoryTransaction{} }
+	pool[packet.IDMobEquipment] = func() packet.Packet { return &legacypacket.MobEquipment{} }
 	pool[packet.IDModalFormResponse] = func() packet.Packet { return &legacypacket.ModalFormResponse{} }
 	pool[packet.IDMovePlayer] = func() packet.Packet { return &legacypacket.MovePlayer{} }
-	pool[packet.IDNetworkChunkPublisherUpdate] = func() packet.Packet { return &legacypacket.NetworkChunkPublisherUpdate{} }
 	pool[packet.IDPlayerAction] = func() packet.Packet { return &legacypacket.PlayerAction{} }
-	pool[packet.IDPlayerList] = func() packet.Packet { return &legacypacket.PlayerList{} }
-	pool[packet.IDPlayerSkin] = func() packet.Packet { return &legacypacket.PlayerSkin{} }
-	pool[packet.IDSetActorData] = func() packet.Packet { return &legacypacket.SetActorData{} }
-	pool[packet.IDStartGame] = func() packet.Packet { return &legacypacket.StartGame{} }
-	pool[packet.IDText] = func() packet.Packet { return &legacypacket.Text{} }
-	pool[packet.IDUpdateAttributes] = func() packet.Packet { return &legacypacket.UpdateAttributes{} }
 	return pool
 }
 
@@ -87,12 +75,75 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				BlockFace:       pk.BlockFace,
 			},
 		}
+	case *legacypacket.InventoryTransaction:
+		actions := make([]protocol.InventoryAction, 0, len(pk.Actions))
+		for _, action := range pk.Actions {
+			actions = append(actions, protocol.InventoryAction{
+				SourceType:    action.SourceType,
+				WindowID:      action.WindowID,
+				SourceFlags:   action.SourceFlags,
+				InventorySlot: action.InventorySlot,
+				OldItem:       protocol.ItemInstance{Stack: upgradeItem(action.OldItem)},
+				NewItem:       protocol.ItemInstance{Stack: upgradeItem(action.NewItem)},
+			})
+		}
+
+		var transactionData protocol.InventoryTransactionData
+		switch data := pk.TransactionData.(type) {
+		case *legacyprotocol.NormalTransactionData:
+			transactionData = &protocol.NormalTransactionData{}
+		case *legacyprotocol.MismatchTransactionData:
+			transactionData = &protocol.MismatchTransactionData{}
+		case *legacyprotocol.UseItemTransactionData:
+			transactionData = &protocol.UseItemTransactionData{
+				ActionType:      data.ActionType,
+				BlockPosition:   data.BlockPosition,
+				BlockFace:       data.BlockFace,
+				HotBarSlot:      data.HotBarSlot,
+				HeldItem:        protocol.ItemInstance{Stack: upgradeItem(data.HeldItem)},
+				Position:        data.Position,
+				ClickedPosition: data.ClickedPosition,
+				BlockRuntimeID:  upgradeBlockRuntimeID(data.BlockRuntimeID),
+			}
+		case *legacyprotocol.UseItemOnEntityTransactionData:
+			transactionData = &protocol.UseItemOnEntityTransactionData{
+				TargetEntityRuntimeID: data.TargetEntityRuntimeID,
+				ActionType:            data.ActionType,
+				HotBarSlot:            data.HotBarSlot,
+				HeldItem:              protocol.ItemInstance{Stack: upgradeItem(data.HeldItem)},
+				Position:              data.Position,
+				ClickedPosition:       data.ClickedPosition,
+			}
+		case *legacyprotocol.ReleaseItemTransactionData:
+			transactionData = &protocol.ReleaseItemTransactionData{
+				ActionType:   data.ActionType,
+				HotBarSlot:   data.HotBarSlot,
+				HeldItem:     protocol.ItemInstance{Stack: upgradeItem(data.HeldItem)},
+				HeadPosition: data.HeadPosition,
+			}
+		}
+
+		return []packet.Packet{
+			&packet.InventoryTransaction{
+				Actions:         actions,
+				TransactionData: transactionData,
+			},
+		}
 	case *legacypacket.ModalFormResponse:
 		return []packet.Packet{
 			&packet.ModalFormResponse{
 				FormID:       pk.FormID,
 				ResponseData: protocol.Option(pk.ResponseData),
-				CancelReason: protocol.Option[uint8](packet.ModalFormCancelReasonUserClosed), // idfk man im not payed enough
+			},
+		}
+	case *legacypacket.MobEquipment:
+		return []packet.Packet{
+			&packet.MobEquipment{
+				EntityRuntimeID: pk.EntityRuntimeID,
+				NewItem:         protocol.ItemInstance{Stack: upgradeItem(pk.NewItem)},
+				InventorySlot:   pk.InventorySlot,
+				HotBarSlot:      pk.HotBarSlot,
+				WindowID:        pk.HotBarSlot,
 			},
 		}
 	}
@@ -181,6 +232,10 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				SubChunkCount: uint32(len(data.SubChunks)),
 			},
 		}
+	case *packet.UpdateBlock:
+		pk.NewBlockRuntimeID = downgradeBlockRuntimeID(pk.NewBlockRuntimeID)
+	case *packet.UpdateBlockSynced:
+		pk.NewBlockRuntimeID = downgradeBlockRuntimeID(pk.NewBlockRuntimeID)
 	case *packet.NetworkChunkPublisherUpdate:
 		return []packet.Packet{
 			&legacypacket.NetworkChunkPublisherUpdate{
@@ -255,22 +310,44 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 		}
 		return []packet.Packet{
 			&legacypacket.AddPlayer{
-				UUID:            pk.UUID,
-				Username:        pk.Username,
-				EntityUniqueID:  pk.EntityUniqueID,
-				EntityRuntimeID: pk.EntityRuntimeID,
-				PlatformChatID:  pk.PlatformChatID,
-				Position:        pk.Position,
-				Velocity:        pk.Velocity,
-				Pitch:           pk.Pitch,
-				Yaw:             pk.Yaw,
-				HeadYaw:         pk.HeadYaw,
-				// HeldItem: pk.HeldItem, ???
+				UUID:                   pk.UUID,
+				Username:               pk.Username,
+				EntityUniqueID:         pk.EntityUniqueID,
+				EntityRuntimeID:        pk.EntityRuntimeID,
+				PlatformChatID:         pk.PlatformChatID,
+				Position:               pk.Position,
+				Velocity:               pk.Velocity,
+				Pitch:                  pk.Pitch,
+				Yaw:                    pk.Yaw,
+				HeadYaw:                pk.HeadYaw,
+				HeldItem:               downgradeItem(pk.HeldItem.Stack),
 				EntityMetadata:         pk.EntityMetadata,
 				CommandPermissionLevel: uint32(pk.CommandPermissions),
 				PermissionLevel:        uint32(pk.PlayerPermissions),
 				EntityLinks:            links,
 				DeviceID:               pk.DeviceID,
+			},
+		}
+	case *packet.MobEquipment:
+		return []packet.Packet{
+			&legacypacket.MobEquipment{
+				EntityRuntimeID: pk.EntityRuntimeID,
+				NewItem:         downgradeItem(pk.NewItem.Stack),
+				InventorySlot:   pk.InventorySlot,
+				HotBarSlot:      pk.HotBarSlot,
+				WindowID:        pk.WindowID,
+			},
+		}
+	case *packet.AddItemActor:
+		return []packet.Packet{
+			&legacypacket.AddItemActor{
+				EntityUniqueID:  pk.EntityUniqueID,
+				EntityRuntimeID: pk.EntityRuntimeID,
+				Item:            downgradeItem(pk.Item.Stack),
+				Position:        pk.Position,
+				Velocity:        pk.Velocity,
+				EntityMetadata:  pk.EntityMetadata,
+				FromFishing:     pk.FromFishing,
 			},
 		}
 	case *packet.ContainerClose:
@@ -376,7 +453,77 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				EntityMetadata:  pk.EntityMetadata,
 			},
 		}
-	case *packet.CreativeContent, *packet.AvailableCommands, *packet.ItemComponent, *packet.InventoryContent, *packet.InventorySlot:
+	case *packet.InventorySlot:
+		return []packet.Packet{
+			&legacypacket.InventorySlot{
+				WindowID: pk.WindowID,
+				Slot:     pk.Slot,
+				NewItem:  downgradeItem(pk.NewItem.Stack),
+			},
+		}
+	case *packet.InventoryContent:
+		content := make([]legacyprotocol.ItemStack, len(pk.Content))
+		for i, instance := range pk.Content {
+			content[i] = downgradeItem(instance.Stack)
+		}
+		return []packet.Packet{
+			&legacypacket.InventoryContent{
+				WindowID: pk.WindowID,
+				Content:  content,
+			},
+		}
+	case *packet.ResourcePacksInfo:
+		behaviourPacks := make([]legacyprotocol.ResourcePackInfo, 0, len(pk.BehaviourPacks))
+		for _, pack := range pk.BehaviourPacks {
+			behaviourPacks = append(behaviourPacks, legacyprotocol.ResourcePackInfo{
+				UUID:            pack.UUID,
+				Version:         pack.Version,
+				Size:            pack.Size,
+				ContentKey:      pack.ContentKey,
+				SubPackName:     pack.SubPackName,
+				ContentIdentity: pack.ContentIdentity,
+				HasScripts:      pack.HasScripts,
+			})
+		}
+		texturePacks := make([]legacyprotocol.ResourcePackInfo, 0, len(pk.TexturePacks))
+		for _, pack := range pk.TexturePacks {
+			texturePacks = append(texturePacks, legacyprotocol.ResourcePackInfo{
+				UUID:            pack.UUID,
+				Version:         pack.Version,
+				Size:            pack.Size,
+				ContentKey:      pack.ContentKey,
+				SubPackName:     pack.SubPackName,
+				ContentIdentity: pack.ContentIdentity,
+				HasScripts:      pack.HasScripts,
+			})
+		}
+		return []packet.Packet{
+			&legacypacket.ResourcePacksInfo{
+				TexturePackRequired: pk.TexturePackRequired,
+				HasScripts:          pk.HasScripts,
+				BehaviourPacks:      behaviourPacks,
+				TexturePacks:        texturePacks,
+			},
+		}
+	case *packet.ResourcePackStack:
+		return []packet.Packet{
+			&legacypacket.ResourcePackStack{
+				TexturePackRequired: pk.TexturePackRequired,
+				BehaviourPacks:      pk.BehaviourPacks,
+				TexturePacks:        pk.TexturePacks,
+				Experimental:        len(pk.Experiments) > 0,
+			},
+		}
+	case *packet.ResourcePackChunkData:
+		return []packet.Packet{
+			&legacypacket.ResourcePackChunkData{
+				UUID:       pk.UUID,
+				ChunkIndex: pk.ChunkIndex,
+				DataOffset: pk.DataOffset,
+				Data:       pk.Data,
+			},
+		}
+	case *packet.CreativeContent, *packet.AvailableCommands, *packet.ItemComponent:
 		return nil
 	case *packet.PlayerSkin:
 		var patch struct {
@@ -407,8 +554,67 @@ var (
 	// latestAirRID is the runtime ID of the air block in the latest version of the game.
 	latestAirRID, _ = latestmappings.StateToRuntimeID("minecraft:air", nil)
 	// legacyAirRID is the runtime ID of the air block in the v1.12.0 version.
-	legacyAirRID, _ = legacymappings.StateToRuntimeID("minecraft:air", nil)
+	legacyAirRID = legacymappings.StateToRuntimeID("minecraft:air", nil)
 )
+
+// downgradeItem downgrades the input item stack to a legacy item stack. It returns a boolean indicating if the item was
+// downgraded successfully.
+func downgradeItem(input protocol.ItemStack) legacyprotocol.ItemStack {
+	name, _ := latestmappings.ItemRuntimeIDToName(input.NetworkID)
+	networkID := legacymappings.ItemIDByName(name)
+	return legacyprotocol.ItemStack{
+		ItemType: legacyprotocol.ItemType{
+			NetworkID:     int32(networkID),
+			MetadataValue: int16(input.MetadataValue),
+		},
+		Count:         int16(input.Count),
+		NBTData:       input.NBTData,
+		CanBePlacedOn: input.CanBePlacedOn,
+		CanBreak:      input.CanBreak,
+	}
+}
+
+// upgradeItem upgrades the input item stack to a v1.19.0 item stack. It returns a boolean indicating if the item was
+// upgraded successfully.
+func upgradeItem(input legacyprotocol.ItemStack) protocol.ItemStack {
+	if input.ItemType.NetworkID == 0 {
+		return protocol.ItemStack{}
+	}
+	name, _ := legacymappings.ItemNameByID(int16(input.ItemType.NetworkID))
+	networkID, _ := latestmappings.ItemNameToRuntimeID(name)
+	return protocol.ItemStack{
+		ItemType: protocol.ItemType{
+			NetworkID:     networkID,
+			MetadataValue: uint32(input.ItemType.MetadataValue),
+		},
+		Count:         uint16(input.Count),
+		NBTData:       input.NBTData,
+		CanBePlacedOn: input.CanBePlacedOn,
+		CanBreak:      input.CanBreak,
+	}
+}
+
+// downgradeBlockRuntimeID downgrades a v1.19.0 block runtime ID to a v1.12.0 block runtime ID.
+func downgradeBlockRuntimeID(input uint32) uint32 {
+	name, properties, ok := latestmappings.RuntimeIDToState(input)
+	if !ok {
+		return legacyAirRID
+	}
+	return legacymappings.StateToRuntimeID(name, properties)
+}
+
+// upgradeBlockRuntimeID upgrades a v1.12.0 block runtime ID to a v1.19.0 block runtime ID.
+func upgradeBlockRuntimeID(input uint32) uint32 {
+	name, properties, ok := legacymappings.RuntimeIDToState(input)
+	if !ok {
+		return latestAirRID
+	}
+	runtimeID, ok := latestmappings.StateToRuntimeID(name, properties)
+	if !ok {
+		return latestAirRID
+	}
+	return runtimeID
+}
 
 // downgradeChunk downgrades a chunk from the latest version to the v1.12.0 equivalent.
 func downgradeChunk(chunk *chunk.Chunk) *legacychunk.Chunk {
@@ -426,18 +632,7 @@ func downgradeChunk(chunk *chunk.Chunk) *legacychunk.Chunk {
 							continue
 						}
 
-						name, properties, ok := latestmappings.RuntimeIDToState(latestRuntimeID)
-						if !ok {
-							// Unknown runtime ID, ignore this position.
-							continue
-						}
-						rid, ok := legacymappings.StateToRuntimeID(name, properties)
-						if !ok {
-							// Unknown state, ignore this position.
-							continue
-						}
-
-						downgradedLayer.SetRuntimeID(x, y, z, rid)
+						downgradedLayer.SetRuntimeID(x, y, z, downgradeBlockRuntimeID(latestRuntimeID))
 					}
 				}
 			}

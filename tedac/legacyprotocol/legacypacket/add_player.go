@@ -50,7 +50,7 @@ type AddPlayer struct {
 	// EntityMetadata is a map of entity metadata, which includes flags and data properties that alter in
 	// particular the way the player looks. Flags include ones such as 'on fire' and 'sprinting'.
 	// The metadata values are indexed by their property key.
-	EntityMetadata map[uint32]interface{}
+	EntityMetadata map[uint32]any
 	// Flags is a set of flags that specify certain properties of the player, such as whether or not it can
 	// fly and/or move through blocks.
 	Flags uint32
@@ -93,7 +93,7 @@ func (pk *AddPlayer) Marshal(w *protocol.Writer) {
 	w.Float32(&pk.Pitch)
 	w.Float32(&pk.Yaw)
 	w.Float32(&pk.HeadYaw)
-	// w.Item(&pk.HeldItem)
+	legacyprotocol.WriteItem(w, &pk.HeldItem)
 	w.EntityMetadata(&pk.EntityMetadata)
 	w.Varuint32(&pk.Flags)
 	w.Varuint32(&pk.CommandPermissionLevel)
@@ -117,7 +117,7 @@ func (pk *AddPlayer) Unmarshal(r *protocol.Reader) {
 	r.Float32(&pk.Pitch)
 	r.Float32(&pk.Yaw)
 	r.Float32(&pk.HeadYaw)
-	// r.Item(&pk.HeldItem)
+	legacyprotocol.Item(r, &pk.HeldItem)
 	r.EntityMetadata(&pk.EntityMetadata)
 	r.Varuint32(&pk.Flags)
 	r.Varuint32(&pk.CommandPermissionLevel)

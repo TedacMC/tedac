@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"github.com/tedacmc/tedac/tedac/latestmappings"
-	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 )
 
 var (
@@ -14,7 +13,7 @@ var (
 	blockStateMetaData []byte
 
 	// blocks holds a list of all existing v in the game.
-	blocks []legacyprotocol.BlockEntry
+	blocks []BlockEntry
 
 	// stateToRuntimeID maps a block state hash to a runtime ID.
 	stateToRuntimeID = map[latestmappings.StateHash]uint32{}
@@ -49,7 +48,7 @@ func init() {
 		state := latestmappings.State{Name: name, Properties: properties}
 		legacyRID := uint32(len(blocks))
 
-		blocks = append(blocks, legacyprotocol.BlockEntry{
+		blocks = append(blocks, BlockEntry{
 			Name:     name,
 			Data:     meta,
 			LegacyID: legacyID,
@@ -60,15 +59,15 @@ func init() {
 }
 
 // StateToRuntimeID converts a name and its state properties to a runtime ID.
-func StateToRuntimeID(name string, properties map[string]any) (runtimeID uint32, found bool) {
+func StateToRuntimeID(name string, properties map[string]any) uint32 {
 	if alias, ok := latestmappings.AliasFromUpdatedName(name); ok {
 		name = alias
 	}
 	rid, ok := stateToRuntimeID[latestmappings.HashState(latestmappings.State{Name: name, Properties: properties})]
 	if !ok {
-		rid, ok = stateToRuntimeID[latestmappings.HashState(latestmappings.State{Name: "minecraft:info_update"})]
+		rid = stateToRuntimeID[latestmappings.HashState(latestmappings.State{Name: "minecraft:info_update"})]
 	}
-	return rid, ok
+	return rid
 }
 
 // RuntimeIDToState converts a runtime ID to a name and its state properties.
@@ -78,6 +77,6 @@ func RuntimeIDToState(runtimeID uint32) (name string, properties map[string]any,
 }
 
 // Blocks returns a slice of all block entries.
-func Blocks() []legacyprotocol.BlockEntry {
+func Blocks() []BlockEntry {
 	return blocks
 }

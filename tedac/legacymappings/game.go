@@ -1,4 +1,4 @@
-package legacyprotocol
+package legacymappings
 
 import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"

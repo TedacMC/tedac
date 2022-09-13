@@ -4,6 +4,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/tedacmc/tedac/tedac/legacymappings"
 	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 )
 
@@ -148,10 +149,10 @@ type StartGame struct {
 	// Blocks is a list of all blocks and variants existing in the game. Failing to send any of the blocks
 	// that are in the game, including any specific variants of that block, will crash mobile clients. It
 	// seems Windows 10 games do not crash.
-	Blocks []legacyprotocol.BlockEntry
+	Blocks []legacymappings.BlockEntry
 	// Items is a list of all items with their legacy IDs which are available in the game. Failing to send any
 	// of the items that are in the game will crash mobile clients.
-	Items []legacyprotocol.ItemEntry
+	Items []legacymappings.ItemEntry
 	// MultiPlayerCorrelationID is a unique ID specifying the multi-player session of the player. A random
 	// UUID should be filled out for this field.
 	MultiPlayerCorrelationID string
