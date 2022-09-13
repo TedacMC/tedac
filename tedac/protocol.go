@@ -35,7 +35,7 @@ func (Protocol) Ver() string {
 // Packets ...
 func (Protocol) Packets() packet.Pool {
 	pool := packet.NewPool()
-	pool[packet.IDContainerClose] = func() packet.Packet { return &legacypacket.ContainerClose{} }
+	//pool[packet.IDContainerClose] = func() packet.Packet { return &legacypacket.ContainerClose{} }
 	pool[packet.IDInventoryTransaction] = func() packet.Packet { return &legacypacket.InventoryTransaction{} }
 	pool[packet.IDMobEquipment] = func() packet.Packet { return &legacypacket.MobEquipment{} }
 	pool[packet.IDModalFormResponse] = func() packet.Packet { return &legacypacket.ModalFormResponse{} }
@@ -347,6 +347,16 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				InventorySlot:   pk.InventorySlot,
 				HotBarSlot:      pk.HotBarSlot,
 				WindowID:        pk.WindowID,
+			},
+		}
+	case *packet.MobArmourEquipment:
+		return []packet.Packet{
+			&legacypacket.MobArmourEquipment{
+				EntityRuntimeID: pk.EntityRuntimeID,
+				Helmet:          downgradeItem(pk.Helmet.Stack),
+				Chestplate:      downgradeItem(pk.Chestplate.Stack),
+				Leggings:        downgradeItem(pk.Leggings.Stack),
+				Boots:           downgradeItem(pk.Boots.Stack),
 			},
 		}
 	case *packet.AddItemActor:

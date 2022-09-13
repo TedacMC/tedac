@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"github.com/pelletier/go-toml"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/tedacmc/tedac/tedac"
 	"io/ioutil"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -42,7 +45,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		go handleConn(c.(*minecraft.Conn), listener, conf, src)
+		go handleConn(c.(*minecraft.Conn), listener, &conf, src)
 	}
 }
 
@@ -55,7 +58,7 @@ const defaultSkinResourcePatch = `{
 `
 
 // handleConn handles a new incoming minecraft.Conn from the minecraft.Listener passed.
-func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config config, src oauth2.TokenSource) {
+func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config *config, src oauth2.TokenSource) {
 	clientData := conn.ClientData()
 	if _, ok := conn.Protocol().(tedac.Protocol); ok {
 		clientData.GameVersion = protocol.CurrentVersion
@@ -117,6 +120,15 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 					_ = listener.Disconnect(conn, disconnect.Error())
 				}
 				return
+			}
+			switch pk := pk.(type) {
+			case *packet.Transfer:
+				address := strings.Split(config.Connection.LocalAddress, ":")
+				port, _ := strconv.Atoi(address[1])
+
+				pk.Address = address[0]
+				pk.Port = uint16(port)
+				config.Connection.RemoteAddress = fmt.Sprintf("%s:%d", pk.Address, pk.Port)
 			}
 			if err := conn.WritePacket(pk); err != nil {
 				return
