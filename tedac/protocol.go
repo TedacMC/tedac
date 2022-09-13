@@ -46,6 +46,7 @@ func (Protocol) Packets() packet.Pool {
 	pool[packet.IDLevelChunk] = func() packet.Packet { return &legacypacket.LevelChunk{} }
 	pool[packet.IDModalFormResponse] = func() packet.Packet { return &legacypacket.ModalFormResponse{} }
 	pool[packet.IDMovePlayer] = func() packet.Packet { return &legacypacket.MovePlayer{} }
+	pool[packet.IDNetworkChunkPublisherUpdate] = func() packet.Packet { return &legacypacket.NetworkChunkPublisherUpdate{} }
 	pool[packet.IDPlayerAction] = func() packet.Packet { return &legacypacket.PlayerAction{} }
 	pool[packet.IDPlayerList] = func() packet.Packet { return &legacypacket.PlayerList{} }
 	pool[packet.IDPlayerSkin] = func() packet.Packet { return &legacypacket.PlayerSkin{} }
@@ -167,7 +168,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			return nil
 		}
 
-		writeBuf, data := bytes.NewBuffer(nil), legacychunk.Encode(downgradeChunk(c, oldFormat), legacychunk.NetworkEncoding)
+		writeBuf, data := bytes.NewBuffer(nil), legacychunk.Encode(downgradeChunk(c), legacychunk.NetworkEncoding)
 		for i := range data.SubChunks {
 			_, _ = writeBuf.Write(data.SubChunks[i])
 		}
@@ -180,6 +181,13 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				Position:      pk.Position,
 				RawPayload:    append(writeBuf.Bytes(), buf.Bytes()...),
 				SubChunkCount: uint32(len(data.SubChunks)),
+			},
+		}
+	case *packet.NetworkChunkPublisherUpdate:
+		return []packet.Packet{
+			&legacypacket.NetworkChunkPublisherUpdate{
+				Position: pk.Position,
+				Radius:   pk.Radius,
 			},
 		}
 	case *packet.MovePlayer:
@@ -287,11 +295,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 					Default string
 				}
 			}
-			err := json.Unmarshal(entry.Skin.SkinResourcePatch, &patch)
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
+			_ = json.Unmarshal(entry.Skin.SkinResourcePatch, &patch)
 			entries = append(entries, legacypacket.PlayerListEntry{
 				UUID:             entry.UUID,
 				EntityUniqueID:   entry.EntityUniqueID,
@@ -311,14 +315,60 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				Entries:    entries,
 			},
 		}
+	case *packet.UpdateAbilities:
+		if len(pk.Layers) == 0 {
+			// We need at least one layer.
+			return nil
+		}
+
+		base, flags, perms := pk.Layers[0].Values, uint32(0), uint32(0)
+		if base&protocol.AbilityMayFly == 0 {
+			flags |= packet.AdventureFlagAllowFlight
+			if base&protocol.AbilityFlying == 0 {
+				flags |= packet.AdventureFlagFlying
+			}
+		}
+		if base&protocol.AbilityNoClip == 0 {
+			flags |= packet.AdventureFlagNoClip
+		}
+
+		if base&protocol.AbilityBuild == 0 {
+			perms |= packet.ActionPermissionBuild
+		}
+		if base&protocol.AbilityMine == 0 {
+			perms |= packet.ActionPermissionMine
+		}
+
+		if base&protocol.AbilityDoorsAndSwitches == 0 {
+			perms |= packet.ActionPermissionDoorsAndSwitches
+		}
+		if base&protocol.AbilityOpenContainers == 0 {
+			perms |= packet.ActionPermissionOpenContainers
+		}
+		if base&protocol.AbilityAttackPlayers == 0 {
+			perms |= packet.ActionPermissionAttackPlayers
+		}
+		if base&protocol.AbilityAttackMobs == 0 {
+			perms |= packet.ActionPermissionAttackMobs
+		}
+		return []packet.Packet{
+			&packet.AdventureSettings{
+				Flags:                  flags,
+				ActionPermissions:      perms,
+				PlayerUniqueID:         pk.EntityUniqueID,
+				CommandPermissionLevel: uint32(pk.CommandPermissions),
+				PermissionLevel:        uint32(pk.PlayerPermissions),
+			},
+		}
 	case *packet.UpdateAttributes:
 		var attributes []legacyprotocol.Attribute
 		for _, a := range pk.Attributes {
 			attributes = append(attributes, legacyprotocol.Attribute{
-				Name:  a.Name,
-				Value: a.Value,
-				Max:   a.Max,
-				Min:   a.Min,
+				Name:    a.Name,
+				Value:   a.Value,
+				Min:     a.Min,
+				Max:     a.Max,
+				Default: a.Default,
 			})
 		}
 		return []packet.Packet{
@@ -334,17 +384,15 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				EntityMetadata:  pk.EntityMetadata,
 			},
 		}
+	case *packet.Animate, *packet.BlockActorData, *packet.CreativeContent, *packet.AvailableCommands, *packet.ItemComponent, *packet.InventoryContent, *packet.InventorySlot:
+		return nil
 	case *packet.PlayerSkin:
 		var patch struct {
 			Geometry struct {
 				Default string
 			}
 		}
-		err := json.Unmarshal(pk.Skin.SkinResourcePatch, &patch)
-		if err != nil {
-			fmt.Println(err)
-			return nil
-		}
+		_ = json.Unmarshal(pk.Skin.SkinResourcePatch, &patch)
 		return []packet.Packet{
 			&legacypacket.PlayerSkin{
 				UUID:             pk.UUID,
@@ -371,17 +419,10 @@ var (
 )
 
 // downgradeChunk downgrades a chunk from the latest version to the v1.12.0 equivalent.
-func downgradeChunk(chunk *chunk.Chunk, oldFormat bool) *legacychunk.Chunk {
+func downgradeChunk(chunk *chunk.Chunk) *legacychunk.Chunk {
 	// First downgrade the blocks.
-	subs := chunk.Sub()
-	if oldFormat {
-		subs = subs[:len(subs)-4]
-	} else {
-		subs = subs[4 : len(subs)-4]
-	}
-
 	downgraded := legacychunk.New(legacyAirRID)
-	for subInd, sub := range subs {
+	for subInd, sub := range chunk.Sub()[4 : len(chunk.Sub())-4] {
 		for layerInd, layer := range sub.Layers() {
 			downgradedLayer := downgraded.Sub()[subInd].Layer(uint8(layerInd))
 			for x := uint8(0); x < 16; x++ {

@@ -9,23 +9,26 @@ import (
 // NetworkDecode decodes the network serialised data passed into a Chunk if successful. If not, the chunk
 // returned is nil and the error non-nil.
 // The sub chunk count passed must be that found in the LevelChunk packet.
-//noinspection GoUnusedExportedFunction
-func NetworkDecode(air uint32, buf *bytes.Buffer, count int, oldBiomes bool, r cube.Range) (*Chunk, error) {
+// noinspection GoUnusedExportedFunction
+func NetworkDecode(air uint32, buf *bytes.Buffer, count int, oldFormat bool, r cube.Range) (*Chunk, error) {
 	var (
 		c   = New(air, r)
 		err error
 	)
 	for i := 0; i < count; i++ {
 		index := uint8(i)
+		if oldFormat {
+			index += 4
+		}
 		c.sub[index], err = DecodeSubChunk(air, r, buf, &index, NetworkEncoding)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if oldBiomes {
+	if oldFormat {
 		// Read the old biomes.
 		biomes := make([]byte, 256)
-		if _, err := buf.Read(biomes[:]); err != nil {
+		if _, err := buf.Read(biomes); err != nil {
 			return nil, fmt.Errorf("error reading biomes: %w", err)
 		}
 

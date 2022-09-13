@@ -31,6 +31,7 @@ type ItemType struct {
 	MetadataValue int16
 }
 
+// Marshal ...
 func (x *ItemStack) Marshal(r protocol.IO) {
 	r.Varint32(&x.NetworkID)
 	if x.NetworkID == 0 {
