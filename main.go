@@ -5,10 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/pelletier/go-toml"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/tedacmc/tedac/tedac"
 	"io/ioutil"
 	"log"
 	"os"
@@ -16,36 +12,60 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/pelletier/go-toml"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/tedacmc/tedac/tedac"
+
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"golang.org/x/oauth2"
 )
 
 // The following program implements a proxy that forwards players from one local address to a remote address.
+
+const (
+	GUI        = false
+	RPC        = true
+	DISCORD_ID = "710885082100924416"
+)
+
 func main() {
+	if GUI {
+		run()
+	} else {
+		server(readConfig().Connection.LocalAddress, readConfig().Connection.RemoteAddress)
+	}
+}
+
+func server(local string, remote string) error {
 	conf := readConfig()
 	src := tokenSource()
 
+	if RPC {
+		go rpc()
+	}
+
 	p, err := minecraft.NewForeignStatusProvider(conf.Connection.RemoteAddress)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	listener, err := minecraft.ListenConfig{
 		StatusProvider:    p,
 		AcceptedProtocols: []minecraft.Protocol{tedac.Protocol{}},
-	}.Listen("raknet", conf.Connection.LocalAddress)
+	}.Listen("raknet", local)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer listener.Close()
 
-	fmt.Println("Tedac is now running on " + conf.Connection.LocalAddress)
+	fmt.Printf("Tedac is now running on %s\n", local)
 	for {
 		c, err := listener.Accept()
 		if err != nil {
-			panic(err)
+			return err
 		}
-		go handleConn(c.(*minecraft.Conn), listener, &conf, src)
+		go handleConn(c.(*minecraft.Conn), listener, &conf, src, remote)
 	}
 }
 
@@ -58,7 +78,7 @@ const defaultSkinResourcePatch = `{
 `
 
 // handleConn handles a new incoming minecraft.Conn from the minecraft.Listener passed.
-func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config *config, src oauth2.TokenSource) {
+func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config *config, src oauth2.TokenSource, remote string) {
 	clientData := conn.ClientData()
 	if _, ok := conn.Protocol().(tedac.Protocol); ok {
 		clientData.GameVersion = protocol.CurrentVersion
@@ -68,13 +88,10 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config *conf
 		clientData.SkinImageWidth = 64
 	}
 
-	b, _ := json.Marshal(clientData)
-	_ = os.WriteFile("client_data.json", b, 0644)
-
 	serverConn, err := minecraft.Dialer{
 		TokenSource: src,
 		ClientData:  clientData,
-	}.Dial("raknet", config.Connection.RemoteAddress)
+	}.Dial("raknet", remote)
 	if err != nil {
 		panic(err)
 	}
