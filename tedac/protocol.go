@@ -51,7 +51,6 @@ func (Protocol) Encryption(key [32]byte) packet.Encryption {
 
 // ConvertToLatest ...
 func (Protocol) ConvertToLatest(pk packet.Packet, conn *minecraft.Conn) []packet.Packet {
-	//fmt.Printf("1.12 -> 1.19: %T\n", pk)
 	switch pk := pk.(type) {
 	case *legacypacket.MovePlayer:
 		if conn.GameData().PlayerMovementSettings.MovementType != protocol.PlayerMovementModeClient {
@@ -165,6 +164,10 @@ func (Protocol) ConvertToLatest(pk packet.Packet, conn *minecraft.Conn) []packet
 				ServerSide: false,
 			},
 		}
+	}
+
+	if pk.ID() == 37 {
+		return []packet.Packet{}
 	}
 	return []packet.Packet{pk}
 }

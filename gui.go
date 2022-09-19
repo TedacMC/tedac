@@ -1,14 +1,13 @@
 package main
 
 import (
-	"fmt"
+	"image"
 	"image/color"
-	"log"
-	"os"
-	"time"
+	"strings"
 
 	"gioui.org/app"
 	"gioui.org/font/gofont"
+	"gioui.org/gesture"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -16,156 +15,143 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
+	"gioui.org/x/richtext"
+	"github.com/inkeliz/giohyperlink"
 )
-
-// Define the progress variables, a channel and a variable
-var progressIncrementer chan bool
-var progress float32
-
-func run() {
-	// Setup a separate channel to provide ticks to increment progress
-	progressIncrementer = make(chan bool)
-	go func() {
-		for {
-			time.Sleep(time.Second / 25)
-			progressIncrementer <- true
-		}
-	}()
-
-	go func() {
-		// create new window
-		w := app.NewWindow(
-			app.Title("Tedac: The 1.12 MCBE Proxy"),
-			app.Size(unit.Dp(360), unit.Dp(360)),
-			app.MaxSize(unit.Dp(360), unit.Dp(360)),
-		)
-		if err := draw(w); err != nil {
-			log.Fatal(err)
-		}
-		os.Exit(0)
-	}()
-
-	app.Main()
-}
 
 type C = layout.Context
 type D = layout.Dimensions
 
-func draw(w *app.Window) error {
-	// ops are the operations from the UI
-	var ops op.Ops
+func run(w *app.Window) error {
+	theme := material.NewTheme(gofont.Collection())
 
-	// startButton is a clickable widget
-	var startButton widget.Clickable
+	var (
+		ops         op.Ops
+		startButton widget.Clickable
+		richText    richtext.InteractiveText
+	)
+	address := widget.Editor{
+		Alignment:  text.Middle,
+		SingleLine: true,
+		Submit:     true,
+	}
+	port := address
+	port.Filter = "0123456789"
+	startText := "Start"
 
-	// boilDurationInput is a textfield to input boil duration
-	var input widget.Editor
-
-	var started bool
-	//var address string
-
-	// th defines the material design style
-	th := material.NewTheme(gofont.Collection())
+	//fontSize := unit.Sp(20)
+	// if mobile {
+	// 	fontSize = unit.Sp(17.3)
+	// }
 
 	for {
-		select {
-		// listen for events in the window.
-		case e := <-w.Events():
+		e := <-w.Events()
+		giohyperlink.ListenEvents(e)
 
-			// detect what type of event
-			switch e := e.(type) {
-			// this is sent when the application should re-render.
-			case system.FrameEvent:
-				gtx := layout.NewContext(&ops, e)
-				// Let's try out the flexbox layout concept
-				if startButton.Clicked() {
-					// Start (or stop) the boil
-					started = !started
+		switch e := e.(type) {
+		case system.DestroyEvent:
+			return e.Err
+		case system.FrameEvent:
+			gtx := layout.NewContext(&ops, e)
 
-					if started {
-						addr := input.Text()
-						fmt.Printf("Connecting... %s", addr)
-						// go func() {
-						// 	err := server("0.0.0.0:19132", addr)
-						// 	if err != nil {
-						// 		fmt.Println(err)
-						// 	}
-						// }()
+			for span, events := richText.Events(); span != nil; span, events = richText.Events() {
+				for _, event := range events {
+					content, _ := span.Content()
+					switch event.Type {
+					case richtext.Click:
+						if event.ClickData.Type == gesture.TypeClick {
+							op.InvalidateOp{}.Add(&ops)
+						}
+						if strings.Contains(content, "https://") {
+							_ = giohyperlink.Open(content)
+						} else {
+							// clipboard.WriteOp{Text: content}.Add(&ops)
+							// if sender, err := toast.NewSender(w); err == nil {
+							// 	_ = sender.SendToast("Copied to clipboard")
+							// }
+						}
 					}
 				}
-
-				layout.Flex{
-					// Vertical alignment, from top to bottom
-					Axis: layout.Vertical,
-					// Empty space is left at the start, i.e. at the top
-					Spacing: layout.SpaceStart,
-				}.Layout(gtx,
-					layout.Rigid(
-						func(gtx C) D {
-							l := material.H1(th, "TedacMC")
-							l.Alignment = text.Middle
-							l.TextSize = 30
-							return l.Layout(gtx)
-						},
-					),
-					// The inputbox
-					layout.Rigid(
-						func(gtx C) D {
-							// Wrap the editor in material design
-							ed := material.Editor(th, &input, "Server Address")
-
-							// Define characteristics of the input box
-							input.SingleLine = true
-							input.Alignment = text.Middle
-
-							// ... and borders ...
-							border := widget.Border{
-								Color:        color.NRGBA{R: 204, G: 204, B: 204, A: 255},
-								CornerRadius: unit.Dp(3),
-								Width:        unit.Dp(2),
-							}
-							// ... before laying it out, one inside the other
-							return border.Layout(gtx, ed.Layout)
-
-						},
-					),
-
-					// The button
-					layout.Rigid(
-						func(gtx C) D {
-							// We start by defining a set of margins
-							margins := layout.Inset{
-								Top:    unit.Dp(25),
-								Bottom: unit.Dp(25),
-								Right:  unit.Dp(10),
-								Left:   unit.Dp(10),
-							}
-							// Then we lay out within those margins
-							return margins.Layout(gtx,
-								func(gtx C) D {
-									// The text on the button depends on program state
-									var text string
-									if started {
-										text = "Stop"
-									} else {
-										text = "Start"
-									}
-									btn := material.Button(th, &startButton, text)
-									return btn.Layout(gtx)
-								},
-							)
-						},
-					),
-				)
-				e.Frame(gtx.Ops)
-
-			// this is sent when the application is closed.
-			case system.DestroyEvent:
-				return e.Err
 			}
 
-			// listen for events in the incrementor channel
-		case <-progressIncrementer:
+			if startButton.Clicked() {
+				if startText == "Start" {
+					go func() {
+						TARGET = address.Text() + ":" + port.Text()
+						server(TARGET)
+						startText = "Stop"
+					}()
+				}
+			}
+
+			var children []layout.FlexChild
+
+			children = append(children,
+				// The title
+				layout.Rigid(func(gtx C) D {
+					title := material.H1(theme, "Tedac")
+					title.Color = color.NRGBA{R: 170, G: 65, B: 145, A: 255}
+					title.Alignment = text.Middle
+					return title.Layout(gtx)
+				}),
+
+				// The server address input
+				layout.Rigid(func(gtx C) D {
+					top := unit.Dp(25)
+					return layout.Inset{
+						Top:    top,
+						Bottom: unit.Dp(25),
+						Right:  unit.Dp(35),
+						Left:   unit.Dp(35),
+					}.Layout(gtx, func(gtx C) D {
+						return material.Editor(theme, &address, "Server IP (ex: vasar.land)").Layout(gtx)
+					})
+				}),
+
+				// The server port input
+				layout.Rigid(func(gtx C) D {
+					return layout.Inset{
+						Top:    unit.Dp(5),
+						Bottom: unit.Dp(5),
+						Right:  unit.Dp(35),
+						Left:   unit.Dp(35),
+					}.Layout(gtx, func(gtx C) D {
+						return material.Editor(theme, &port, "Server Port (default: 19132)").Layout(gtx)
+					})
+				}),
+
+				// The start button
+				layout.Rigid(func(gtx C) D {
+					return layout.Inset{
+						Top:    unit.Dp(25),
+						Bottom: unit.Dp(25),
+						Right:  unit.Dp(35),
+						Left:   unit.Dp(35),
+					}.Layout(gtx, func(gtx C) D {
+						return material.Button(theme, &startButton, startText).Layout(gtx)
+					})
+				}),
+
+				// The debug text
+				layout.Rigid(func(gtx C) D {
+					return layout.Inset{
+						Right: unit.Dp(35),
+						Left:  unit.Dp(35),
+					}.Layout(gtx, func(gtx C) D {
+						return richtext.Text(&richText, theme.Shaper).Layout(gtx)
+					})
+				}),
+			)
+
+			macro := op.Record(gtx.Ops)
+			gtx.Constraints.Min.Y = 0
+			dims := layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
+			call := macro.Stop()
+
+			op.Offset(image.Point{Y: int((float32(gtx.Constraints.Max.Y)*0.95 - float32(dims.Size.Y)) / 2)}).Add(&ops)
+			call.Add(&ops)
+
+			e.Frame(gtx.Ops)
 		}
 	}
 }

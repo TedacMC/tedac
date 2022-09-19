@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"gioui.org/app"
 	"github.com/pelletier/go-toml"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -22,12 +23,40 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// The following program implements a proxy that forwards players from one local address to a remote address.
+var (
+	RPC    = false
+	GUI    = true
+	TARGET = ""
+)
+
 func main() {
+	if RPC {
+		go rpc()
+	}
+
+	if GUI {
+		go func() {
+			w := app.NewWindow()
+			err := run(w)
+			if err != nil {
+				log.Fatal(err)
+			}
+			os.Exit(0)
+		}()
+		app.Title("TedacMC")
+		app.Main()
+	} else {
+		TARGET = readConfig().Connection.RemoteAddress
+		server(TARGET)
+	}
+}
+
+// The following program implements a proxy that forwards players from one local address to a remote address.
+func server(remote string) {
 	conf := readConfig()
 	src := tokenSource()
 
-	p, err := minecraft.NewForeignStatusProvider(conf.Connection.RemoteAddress)
+	p, err := minecraft.NewForeignStatusProvider(TARGET)
 	if err != nil {
 		panic(err)
 	}
@@ -85,7 +114,7 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config *conf
 	serverConn, err := minecraft.Dialer{
 		TokenSource: src,
 		ClientData:  clientData,
-	}.Dial("raknet", config.Connection.RemoteAddress)
+	}.Dial("raknet", TARGET)
 	if err != nil {
 		panic(err)
 	}
@@ -123,7 +152,7 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config *conf
 	}()
 	go func() {
 		defer serverConn.Close()
-		defer listener.Disconnect(conn, "connection lost")
+		defer listener.Disconnect(conn, "server connection lost")
 		for {
 			pk, err := serverConn.ReadPacket()
 			if err != nil {
@@ -137,6 +166,8 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config *conf
 				port, _ := strconv.Atoi(address[1])
 
 				config.Connection.RemoteAddress = fmt.Sprintf("%s:%d", pk.Address, pk.Port)
+				TARGET = fmt.Sprintf("%s:%d", pk.Address, pk.Port)
+
 				pk.Address = address[0]
 				pk.Port = uint16(port)
 
