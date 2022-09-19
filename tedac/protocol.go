@@ -35,7 +35,7 @@ func (Protocol) Ver() string {
 // Packets ...
 func (Protocol) Packets() packet.Pool {
 	pool := packet.NewPool()
-	//pool[packet.IDContainerClose] = func() packet.Packet { return &legacypacket.ContainerClose{} }
+	pool[packet.IDContainerClose] = func() packet.Packet { return &legacypacket.ContainerClose{} }
 	pool[packet.IDInventoryTransaction] = func() packet.Packet { return &legacypacket.InventoryTransaction{} }
 	pool[packet.IDMobEquipment] = func() packet.Packet { return &legacypacket.MobEquipment{} }
 	pool[packet.IDModalFormResponse] = func() packet.Packet { return &legacypacket.ModalFormResponse{} }
@@ -51,10 +51,11 @@ func (Protocol) Encryption(key [32]byte) packet.Encryption {
 
 // ConvertToLatest ...
 func (Protocol) ConvertToLatest(pk packet.Packet, conn *minecraft.Conn) []packet.Packet {
-	// fmt.Printf("1.12 -> 1.19: %T\n", pk)
+	//fmt.Printf("1.12 -> 1.19: %T\n", pk)
 	switch pk := pk.(type) {
 	case *legacypacket.MovePlayer:
 		if conn.GameData().PlayerMovementSettings.MovementType != protocol.PlayerMovementModeClient {
+			//fmt.Printf("1.12 -> 1.19: *legacypacket.MovePlayer -> *packet.PlayerAuthInput\n")
 			return []packet.Packet{
 				&packet.PlayerAuthInput{
 					Pitch:    pk.Pitch,
@@ -155,6 +156,13 @@ func (Protocol) ConvertToLatest(pk packet.Packet, conn *minecraft.Conn) []packet
 				InventorySlot:   pk.InventorySlot,
 				HotBarSlot:      pk.HotBarSlot,
 				WindowID:        pk.HotBarSlot,
+			},
+		}
+	case *legacypacket.ContainerClose:
+		return []packet.Packet{
+			&packet.ContainerClose{
+				WindowID:   pk.WindowID,
+				ServerSide: false,
 			},
 		}
 	}
@@ -565,6 +573,10 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				SkinGeometry:     pk.Skin.SkinGeometry,
 				PremiumSkin:      pk.Skin.PremiumSkin,
 			},
+		}
+	case *packet.Animate:
+		if pk.ActionType > 4 {
+			return []packet.Packet{}
 		}
 	}
 	//fmt.Printf("1.19 -> 1.12: %T\n", pk)

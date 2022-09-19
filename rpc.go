@@ -1,22 +1,21 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/hugolgst/rich-go/client"
 )
 
 func rpc() {
-	err := client.Login(DISCORD_ID)
+	err := client.Login("DISCORD_ID")
 	if err != nil {
 		panic(err)
 	}
 
 	time := time.Now()
 	err = client.SetActivity(client.Activity{
-		State:      "TedacMC",
-		Details:    fmt.Sprintf("Playing MCBE 1.12 on %s", readConfig().Connection.RemoteAddress),
+		State:      readConfig().Connection.RemoteAddress,
+		Details:    "Playing MCBE on 1.12",
 		LargeImage: "tedac",
 		LargeText:  "TedacMC",
 		SmallImage: "mc",

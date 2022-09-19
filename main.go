@@ -23,49 +23,40 @@ import (
 )
 
 // The following program implements a proxy that forwards players from one local address to a remote address.
-
-const (
-	GUI        = false
-	RPC        = true
-	DISCORD_ID = "710885082100924416"
-)
-
 func main() {
-	if GUI {
-		run()
-	} else {
-		server(readConfig().Connection.LocalAddress, readConfig().Connection.RemoteAddress)
-	}
-}
-
-func server(local string, remote string) error {
 	conf := readConfig()
 	src := tokenSource()
 
-	if RPC {
-		go rpc()
-	}
-
 	p, err := minecraft.NewForeignStatusProvider(conf.Connection.RemoteAddress)
 	if err != nil {
-		return err
+		panic(err)
 	}
+
+	// tmp, err := minecraft.Dialer{
+	// 	TokenSource: src,
+	// }.Dial("raknet", conf.Connection.RemoteAddress)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// _ = tmp.Close()
+
 	listener, err := minecraft.ListenConfig{
 		StatusProvider:    p,
 		AcceptedProtocols: []minecraft.Protocol{tedac.Protocol{}},
-	}.Listen("raknet", local)
+		//ResourcePacks:     tmp.ResourcePacks(),
+	}.Listen("raknet", conf.Connection.LocalAddress)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	defer listener.Close()
 
-	fmt.Printf("Tedac is now running on %s\n", local)
+	fmt.Println("Tedac is now running on " + conf.Connection.LocalAddress)
 	for {
 		c, err := listener.Accept()
 		if err != nil {
-			return err
+			panic(err)
 		}
-		go handleConn(c.(*minecraft.Conn), listener, &conf, src, remote)
+		go handleConn(c.(*minecraft.Conn), listener, &conf, src)
 	}
 }
 
@@ -78,7 +69,7 @@ const defaultSkinResourcePatch = `{
 `
 
 // handleConn handles a new incoming minecraft.Conn from the minecraft.Listener passed.
-func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config *config, src oauth2.TokenSource, remote string) {
+func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config *config, src oauth2.TokenSource) {
 	clientData := conn.ClientData()
 	if _, ok := conn.Protocol().(tedac.Protocol); ok {
 		clientData.GameVersion = protocol.CurrentVersion
@@ -88,10 +79,13 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config *conf
 		clientData.SkinImageWidth = 64
 	}
 
+	b, _ := json.Marshal(clientData)
+	_ = os.WriteFile("client_data.json", b, 0644)
+
 	serverConn, err := minecraft.Dialer{
 		TokenSource: src,
 		ClientData:  clientData,
-	}.Dial("raknet", remote)
+	}.Dial("raknet", config.Connection.RemoteAddress)
 	if err != nil {
 		panic(err)
 	}
@@ -136,19 +130,24 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config *conf
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
 					_ = listener.Disconnect(conn, disconnect.Error())
 				}
-				return
 			}
 			switch pk := pk.(type) {
 			case *packet.Transfer:
 				address := strings.Split(config.Connection.LocalAddress, ":")
 				port, _ := strconv.Atoi(address[1])
 
+				config.Connection.RemoteAddress = fmt.Sprintf("%s:%d", pk.Address, pk.Port)
 				pk.Address = address[0]
 				pk.Port = uint16(port)
-				config.Connection.RemoteAddress = fmt.Sprintf("%s:%d", pk.Address, pk.Port)
+
+				conn.WritePacket(&packet.Transfer{
+					Address: "127.0.0.1",
+					Port:    19132,
+				})
+				return
 			}
 			if err := conn.WritePacket(pk); err != nil {
-				return
+				fmt.Println("ERROR", err)
 			}
 		}
 	}()

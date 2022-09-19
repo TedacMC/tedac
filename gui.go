@@ -85,12 +85,12 @@ func draw(w *app.Window) error {
 					if started {
 						addr := input.Text()
 						fmt.Printf("Connecting... %s", addr)
-						go func() {
-							err := server("0.0.0.0:19132", addr)
-							if err != nil {
-								fmt.Println(err)
-							}
-						}()
+						// go func() {
+						// 	err := server("0.0.0.0:19132", addr)
+						// 	if err != nil {
+						// 		fmt.Println(err)
+						// 	}
+						// }()
 					}
 				}
 
