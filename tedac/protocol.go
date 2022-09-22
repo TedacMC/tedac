@@ -35,7 +35,7 @@ func (Protocol) Ver() string {
 // Packets ...
 func (Protocol) Packets() packet.Pool {
 	pool := packet.NewPool()
-	//pool[packet.IDContainerClose] = func() packet.Packet { return &legacypacket.ContainerClose{} }
+	pool[packet.IDContainerClose] = func() packet.Packet { return &legacypacket.ContainerClose{} }
 	pool[packet.IDInventoryTransaction] = func() packet.Packet { return &legacypacket.InventoryTransaction{} }
 	pool[packet.IDMobEquipment] = func() packet.Packet { return &legacypacket.MobEquipment{} }
 	pool[packet.IDModalFormResponse] = func() packet.Packet { return &legacypacket.ModalFormResponse{} }
@@ -157,6 +157,17 @@ func (Protocol) ConvertToLatest(pk packet.Packet, conn *minecraft.Conn) []packet
 				WindowID:        pk.HotBarSlot,
 			},
 		}
+	case *legacypacket.ContainerClose:
+		return []packet.Packet{
+			&packet.ContainerClose{
+				WindowID:   pk.WindowID,
+				ServerSide: false,
+			},
+		}
+	}
+
+	if pk.ID() == 37 { // TODO: This is so fucking ugly why just why
+		return []packet.Packet{}
 	}
 	return []packet.Packet{pk}
 }
@@ -421,32 +432,19 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 		}
 
 		base, flags := pk.AbilityData.Layers[0].Values, uint32(0)
-		flags &= ^uint32(packet.AdventureFlagWorldImmutable)
-
 		if base&protocol.AbilityAttackPlayers != 0 {
 			flags |= packet.AdventureSettingsFlagsNoPvM
-		} else {
-			flags &= ^uint32(packet.AdventureSettingsFlagsNoPvM)
 		}
-
-		flags &= ^uint32(packet.AdventureFlagAutoJump)
-
 		if base&protocol.AbilityMayFly == 0 {
 			flags |= packet.AdventureFlagAllowFlight
-		} else {
-			flags &= ^uint32(packet.AdventureFlagAllowFlight)
 		}
 
 		if base&protocol.AbilityNoClip == 0 {
 			flags |= packet.AdventureFlagNoClip
-		} else {
-			flags &= ^uint32(packet.AdventureFlagNoClip)
 		}
 
 		if base&protocol.AbilityFlying == 0 {
 			flags |= packet.AdventureFlagFlying
-		} else {
-			flags &= ^uint32(packet.AdventureFlagFlying)
 		}
 
 		return []packet.Packet{
@@ -568,6 +566,10 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				SkinGeometry:     pk.Skin.SkinGeometry,
 				PremiumSkin:      pk.Skin.PremiumSkin,
 			},
+		}
+	case *packet.Animate:
+		if pk.ActionType > 4 { // TODO: This is also pretty fucking ugly
+			return []packet.Packet{}
 		}
 	}
 	return []packet.Packet{pk}
