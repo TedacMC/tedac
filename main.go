@@ -5,15 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/df-mc/dragonfly/server/world"
 	"github.com/pelletier/go-toml"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/tedacmc/tedac/tedac"
-	"io/ioutil"
 	"log"
 	"os"
-	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -39,7 +37,7 @@ func main() {
 	}
 	defer listener.Close()
 
-	fmt.Println("Tedac is now running on " + conf.Connection.LocalAddress)
+	fmt.Println("Tedac is now running on " + conf.Connection.LocalAddress + " for v" + protocol.CurrentVersion)
 	for {
 		c, err := listener.Accept()
 		if err != nil {
@@ -60,16 +58,13 @@ const defaultSkinResourcePatch = `{
 // handleConn handles a new incoming minecraft.Conn from the minecraft.Listener passed.
 func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config *config, src oauth2.TokenSource) {
 	clientData := conn.ClientData()
-	if _, ok := conn.Protocol().(tedac.Protocol); ok {
+	if _, ok := conn.Protocol().(tedac.Protocol); ok { // TODO: Adjust this inside Protocol itself.
 		clientData.GameVersion = protocol.CurrentVersion
 
 		clientData.SkinResourcePatch = base64.StdEncoding.EncodeToString([]byte(defaultSkinResourcePatch))
 		clientData.SkinImageHeight = 64
 		clientData.SkinImageWidth = 64
 	}
-
-	b, _ := json.Marshal(clientData)
-	_ = os.WriteFile("client_data.json", b, 0644)
 
 	serverConn, err := minecraft.Dialer{
 		TokenSource: src,
@@ -122,13 +117,33 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config *conf
 				return
 			}
 			switch pk := pk.(type) {
-			case *packet.Transfer:
-				address := strings.Split(config.Connection.LocalAddress, ":")
-				port, _ := strconv.Atoi(address[1])
+			case *packet.SubChunk:
+				// TODO: Re-encode the sub chunk to the correct format.
+			case *packet.LevelChunk:
+				if pk.SubChunkRequestMode != protocol.SubChunkRequestModeLegacy {
+					max := world.Overworld.Range().Height() >> 4
+					if pk.SubChunkRequestMode == protocol.SubChunkRequestModeLimited {
+						max = int(pk.HighestSubChunk)
+					}
 
-				pk.Address = address[0]
-				pk.Port = uint16(port)
+					offsets := make([]protocol.SubChunkOffset, 0, max)
+					for i := 0; i < max; i++ {
+						offsets = append(offsets, protocol.SubChunkOffset{0, int8(i), 0})
+					}
+
+					_ = serverConn.WritePacket(&packet.SubChunkRequest{
+						Position: protocol.SubChunkPos{pk.Position.X(), 0, pk.Position.Z()},
+						Offsets:  offsets,
+					})
+					continue
+				}
+			case *packet.Transfer:
 				config.Connection.RemoteAddress = fmt.Sprintf("%s:%d", pk.Address, pk.Port)
+
+				pk.Address = "127.0.0.1"
+				pk.Port = 19132
+
+				fmt.Println(config.Connection.RemoteAddress)
 			}
 			if err := conn.WritePacket(pk); err != nil {
 				return
@@ -186,7 +201,7 @@ func tokenSource() oauth2.TokenSource {
 		}
 	}
 	token := new(oauth2.Token)
-	tokenData, err := ioutil.ReadFile("token.tok")
+	tokenData, err := os.ReadFile("token.tok")
 	if err == nil {
 		_ = json.Unmarshal(tokenData, token)
 	} else {
@@ -204,6 +219,6 @@ func tokenSource() oauth2.TokenSource {
 	}
 	tok, _ := src.Token()
 	b, _ := json.Marshal(tok)
-	_ = ioutil.WriteFile("token.tok", b, 0644)
+	_ = os.WriteFile("token.tok", b, 0644)
 	return src
 }

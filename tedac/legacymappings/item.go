@@ -43,7 +43,7 @@ func ItemNameByID(id int16) (string, bool) {
 }
 
 // ItemIDByName returns an item's ID by its name.
-func ItemIDByName(name string) int16 {
+func ItemIDByName(name string) (int16, bool) {
 	if name == "minecraft:nether_star" {
 		name = "minecraft:netherstar"
 	}
@@ -53,7 +53,7 @@ func ItemIDByName(name string) int16 {
 	if !ok {
 		id = itemNamesToIDs["minecraft:name_tag"]
 	}
-	return id
+	return id, ok
 }
 
 // Items returns a slice of all item entries.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"io"
+	"math"
 )
 
 // ZLibCompression is an implementation of the zLib compression algorithm.
@@ -13,7 +14,7 @@ type ZLibCompression struct{}
 
 // EncodeCompression ...
 func (ZLibCompression) EncodeCompression() uint16 {
-	return 1
+	return math.MaxUint16
 }
 
 // Compress ...

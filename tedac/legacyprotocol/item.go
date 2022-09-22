@@ -33,7 +33,7 @@ type ItemType struct {
 }
 
 // shieldID represents the ID of a shield in the 1.12 item table.
-var shieldID = legacymappings.ItemIDByName("minecraft:shield")
+var shieldID, _ = legacymappings.ItemIDByName("minecraft:shield")
 
 // Item reads an item stack from buffer src and stores it into item stack x.
 func Item(r *protocol.Reader, x *ItemStack) {

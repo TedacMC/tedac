@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
+	"github.com/segmentio/fasthash/fnv1"
 	"sort"
 	"strings"
 	"unsafe"
@@ -23,6 +24,9 @@ type State struct {
 var (
 	//go:embed block_states.nbt
 	blockStateData []byte
+
+	// states holds a list of all possible vanilla block states.
+	states []State
 	// stateRuntimeIDs holds a map for looking up the runtime ID of a block by the stateHash it produces.
 	stateRuntimeIDs = map[StateHash]uint32{}
 	// runtimeIDToState holds a map for looking up the blockState of a block by its runtime ID.
@@ -58,9 +62,31 @@ func init() {
 		if err := dec.Decode(&s); err != nil {
 			break
 		}
-		rid := uint32(len(stateRuntimeIDs))
+
+		rid := uint32(len(states))
+		states = append(states, s)
+
 		stateRuntimeIDs[HashState(s)] = rid
 		runtimeIDToState[rid] = s
+	}
+}
+
+// Adjust adjusts the latest mappings to account for custom states.
+func Adjust(customStates []State) {
+	adjustedStates := append(states, customStates...)
+	sort.SliceStable(adjustedStates, func(i, j int) bool {
+		stateOne, stateTwo := adjustedStates[i], adjustedStates[j]
+		if stateOne.Name == stateTwo.Name {
+			return false
+		}
+		return fnv1.HashString64(stateOne.Name) < fnv1.HashString64(stateTwo.Name)
+	})
+
+	stateRuntimeIDs = make(map[StateHash]uint32, len(adjustedStates))
+	runtimeIDToState = make(map[uint32]State, len(adjustedStates))
+	for rid, state := range adjustedStates {
+		stateRuntimeIDs[HashState(state)] = uint32(rid)
+		runtimeIDToState[uint32(rid)] = state
 	}
 }
 

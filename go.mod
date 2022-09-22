@@ -8,8 +8,9 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/pelletier/go-toml v1.9.5
 	github.com/samber/lo v1.28.0
-	github.com/sandertv/go-raknet v1.11.1
+	github.com/sandertv/go-raknet v1.12.0
 	github.com/sandertv/gophertunnel v1.24.6
+	github.com/segmentio/fasthash v1.0.3
 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1
 )
 
@@ -17,6 +18,7 @@ require (
 	github.com/brentp/intintmap v0.0.0-20190211203843-30dc0ade9af9 // indirect
 	github.com/df-mc/atomic v1.10.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
@@ -34,6 +36,6 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 )
 
-replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.3
+replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.4
 
-replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v0.0.6
+replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v0.0.13
