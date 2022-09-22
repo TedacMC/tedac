@@ -103,6 +103,7 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config *conf
 				}
 				return
 			}
+			_ = serverConn.Flush()
 		}
 	}()
 	go func() {
@@ -148,6 +149,7 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config *conf
 			if err := conn.WritePacket(pk); err != nil {
 				return
 			}
+			_ = conn.Flush()
 		}
 	}()
 }
