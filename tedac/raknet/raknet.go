@@ -1,11 +1,10 @@
 package raknet
 
 import (
-	"net"
-
 	"github.com/sandertv/go-raknet"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"net"
 )
 
 // MultiRakNet is an implementation of a RakNet v9/10 Network.

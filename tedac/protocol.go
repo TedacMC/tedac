@@ -177,14 +177,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 	//fmt.Printf("1.19.30 -> 1.12: %T\n", pk)
 	switch pk := pk.(type) {
 	case *packet.StartGame:
-		// Adjust our mappings to account for any possible custom blocks.
-		latestmappings.Adjust(lo.Map(pk.Blocks, func(entry protocol.BlockEntry, _ int) latestmappings.State {
-			return latestmappings.State{
-				Name:    entry.Name,
-				Version: chunk.CurrentBlockVersion,
-			}
-		}))
-
+		// TODO: Adjust our mappings to account for any possible custom blocks.
 		return []packet.Packet{
 			&legacypacket.StartGame{
 				EntityUniqueID:                 pk.EntityUniqueID,
