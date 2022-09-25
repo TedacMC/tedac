@@ -11,10 +11,8 @@ function Connection() {
         local_address: "", remote_address: "",
     })
     useEffect(() => {
-        ProxyingInfo()
-            .then(result => setProxyingInfo(result))
-            .catch(() => navigate("/"))
-    })
+        ProxyingInfo().then(result => setProxyingInfo(result))
+    }, [])
 
     return (
         <div>
@@ -24,13 +22,15 @@ function Connection() {
                 </h1>
                 <div className={"ml-48 mr-4 mt-5 flex flex-col"}>
                     <code className={"text-slate-800 dark:text-blue-100 opacity-50 text-2xl"}>connect to</code>
-                    <code className={"text-slate-900 dark:text-blue-200 opacity-50 text-3xl"}>{proxyingInfo.local_address}</code>
+                    <code
+                        className={"text-slate-900 dark:text-blue-200 opacity-50 text-3xl"}>{proxyingInfo.local_address}</code>
                 </div>
             </div>
             <div className="mt-12">
                 <p className="text-md text-slate-600 max-w-xl dark:text-slate-400">
                     Tedac is now proxying your connection to
-                    <code className={"ml-1 text-slate-900 dark:text-blue-200 opacity-50 text-md"}>{proxyingInfo.remote_address}</code>.
+                    <code
+                        className={"ml-1 text-slate-900 dark:text-blue-200 opacity-50 text-md"}>{proxyingInfo.remote_address}</code>.
                 </p>
                 <p className="mt-4 text-md text-slate-600 max-w-xl dark:text-slate-400">
                     In order to connect to the server, join the proxy address above. Doing so will connect you through
@@ -40,7 +40,9 @@ function Connection() {
                 <div className={"mt-4"}>
                     <p className="text-md text-slate-600 max-w-xl dark:text-slate-400">
                         For support,
-                        <a href="#" onClick={() => BrowserOpenURL("https://discord.gg/7Y4ruNgjgt")} className="ml-1 mt-4 mr-1 text-md font-semibold text-sky-600 max-w-xl dark:text-sky-400">join our Discord server</a>
+                        <a href="#" onClick={() => BrowserOpenURL("https://discord.gg/7Y4ruNgjgt")}
+                           className="ml-1 mt-4 mr-1 text-md font-semibold text-sky-600 max-w-xl dark:text-sky-400">join
+                            our Discord server</a>
                         and open a ticket.
                     </p>
                 </div>
