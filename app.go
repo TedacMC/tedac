@@ -6,6 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"os"
+	"sync"
+
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
@@ -14,9 +18,6 @@ import (
 	"github.com/tedacmc/tedac/tedac"
 	"github.com/wailsapp/wails/lib/renderer/webview"
 	"golang.org/x/oauth2"
-	"net"
-	"os"
-	"sync"
 )
 
 // App ...
@@ -27,11 +28,14 @@ type App struct {
 
 	src oauth2.TokenSource
 	ctx context.Context
+
+	rpc     bool
+	rpcChan chan interface{}
 }
 
 // NewApp creates a new App application struct.
 func NewApp() *App {
-	return &App{src: tokenSource()}
+	return &App{src: tokenSource(), rpcChan: make(chan interface{})}
 }
 
 // ProxyInfo ...
@@ -51,11 +55,31 @@ func (a *App) ProxyingInfo() (ProxyInfo, error) {
 	}, nil
 }
 
+// StartRPC starts the Discord Rich Presence module of Tedac
+func (a *App) startRPC() {
+	go func() {
+		a.rpc = true
+		for {
+			select {
+			case <-a.rpcChan:
+				a.rpc = false
+				return
+			default:
+				if a.rpc {
+					rpc(a.remoteAddress)
+					a.rpc = false
+				}
+			}
+		}
+	}()
+}
+
 // Terminate terminates any existing Tedac connection.
 func (a *App) Terminate() {
 	if a.listener == nil {
 		return
 	}
+	a.rpcChan <- struct{}{}
 	_ = a.listener.Close()
 }
 
@@ -82,6 +106,8 @@ func (a *App) Connect(address string) error {
 
 	a.remoteAddress = address
 	a.localPort = uint16(port)
+
+	a.startRPC()
 
 	a.listener, err = minecraft.ListenConfig{
 		StatusProvider:    p,

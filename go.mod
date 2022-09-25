@@ -6,6 +6,7 @@ require (
 	github.com/df-mc/dragonfly v0.8.5
 	github.com/go-gl/mathgl v1.0.0
 	github.com/google/uuid v1.3.0
+	github.com/hugolgst/rich-go v0.0.0-20210925091458-d59fb695d9c0
 	github.com/samber/lo v1.27.1
 	github.com/sandertv/go-raknet v1.12.0
 	github.com/sandertv/gophertunnel v1.24.7
@@ -49,6 +50,7 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
+	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 )
 
