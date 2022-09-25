@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/samber/lo"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -161,6 +162,13 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 	if pk.ID() == 37 { // TODO: This is so fucking ugly why just why
 		return []packet.Packet{}
 	}
+
+	latest := packet.NewPool()
+	if _, ok := latest[pk.ID()]; !ok {
+		// This means that the packet does not exist on latest and we shouldn't send it
+		return []packet.Packet{}
+	}
+
 	return []packet.Packet{pk}
 }
 
@@ -552,8 +560,19 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 		if pk.EventType == packet.LevelEventParticlesDestroyBlock || pk.EventType == packet.LevelEventParticlesCrackBlock {
 			pk.EventData = int32(downgradeBlockRuntimeID(uint32(pk.EventData)))
 		}
-	case *packet.CreativeContent, *packet.AvailableCommands, *packet.ItemComponent:
-		return nil
+	case *packet.CreativeContent:
+		return []packet.Packet{
+			&legacypacket.InventoryContent{
+				WindowID: 121,
+				Content: lo.Map(pk.Items, func(instance protocol.CreativeItem, _ int) legacyprotocol.ItemStack {
+					return downgradeItem(instance.Item)
+				}),
+			},
+		}
+	case *packet.LevelSoundEvent:
+		if pk.SoundType == 113 || pk.SoundType == 145 || pk.SoundType == 151 || pk.SoundType <= 198 && pk.SoundType >= 195 || pk.SoundType == 222 || pk.SoundType == 227 {
+			return []packet.Packet{}
+		}
 	case *packet.PlayerSkin:
 		var patch struct {
 			Geometry struct {
