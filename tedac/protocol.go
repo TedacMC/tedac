@@ -560,6 +560,41 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 		if pk.EventType == packet.LevelEventParticlesDestroyBlock || pk.EventType == packet.LevelEventParticlesCrackBlock {
 			pk.EventData = int32(downgradeBlockRuntimeID(uint32(pk.EventData)))
 		}
+	case *packet.AvailableCommands:
+		cmds := []legacyprotocol.Command{}
+		for _, c := range pk.Commands {
+			overloads := []legacyprotocol.CommandOverload{}
+			for _, o := range c.Overloads {
+				params := []legacyprotocol.CommandParameter{}
+				for _, p := range o.Parameters {
+					cmdType := p.Type
+					params = append(params, legacyprotocol.CommandParameter{
+						Name:                p.Name,
+						Type:                cmdType,
+						Optional:            p.Optional,
+						CollapseEnumOptions: true,
+						Enum:                legacyprotocol.CommandEnum(p.Enum),
+						Suffix:              p.Suffix,
+					})
+				}
+				overloads = append(overloads, legacyprotocol.CommandOverload{
+					Parameters: params,
+				})
+			}
+			cmds = append(cmds, legacyprotocol.Command{
+				Name:            c.Name,
+				Description:     c.Description,
+				Flags:           byte(c.Flags),
+				PermissionLevel: c.PermissionLevel,
+				Aliases:         c.Aliases,
+				Overloads:       overloads,
+			})
+		}
+		return []packet.Packet{
+			&legacypacket.AvailableCommands{
+				Commands: cmds,
+			},
+		}
 	case *packet.CreativeContent:
 		return []packet.Packet{
 			&legacypacket.InventoryContent{
