@@ -54,6 +54,4 @@ require (
 
 replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.4
 
-replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v0.0.15
-
-replace github.com/wailsapp/wails/v2 => C:\Users\JustTal\Desktop\wails\v2
+replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v0.0.18

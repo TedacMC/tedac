@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/samber/lo"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -158,6 +157,9 @@ func (Protocol) ConvertToLatest(pk packet.Packet, conn *minecraft.Conn) []packet
 			},
 		}
 	case *legacypacket.ContainerClose:
+		if pk.WindowID == 255 {
+			pk.WindowID = 1
+		}
 		return []packet.Packet{
 			&packet.ContainerClose{
 				WindowID:   pk.WindowID,
@@ -194,6 +196,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				WorldSpawn:                     pk.WorldSpawn,
 				AchievementsDisabled:           pk.AchievementsDisabled,
 				DayCycleLockTime:               pk.DayCycleLockTime,
+				EducationFeaturesEnabled:       pk.EducationFeaturesEnabled,
 				RainLevel:                      pk.RainLevel,
 				LightningLevel:                 pk.LightningLevel,
 				ConfirmedPlatformLockedContent: pk.ConfirmedPlatformLockedContent,
@@ -205,7 +208,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				TexturePackRequired:            pk.TexturePackRequired,
 				BonusChestEnabled:              pk.BonusChestEnabled,
 				StartWithMapEnabled:            pk.StartWithMapEnabled,
-				PlayerPermissions:              int32(pk.PlayerPermissions),
+				PlayerPermissions:              pk.PlayerPermissions,
 				ServerChunkTickRadius:          pk.ServerChunkTickRadius,
 				HasLockedBehaviourPack:         pk.HasLockedBehaviourPack,
 				HasLockedTexturePack:           pk.HasLockedTexturePack,
@@ -216,12 +219,13 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				OnlySpawnV1Villagers:           pk.OnlySpawnV1Villagers,
 				LevelID:                        pk.LevelID,
 				WorldName:                      pk.WorldName,
+				PremiumWorldTemplateID:         pk.TemplateContentIdentity,
 				Trial:                          pk.Trial,
 				Time:                           pk.Time,
 				EnchantmentSeed:                pk.EnchantmentSeed,
+				MultiPlayerCorrelationID:       pk.MultiPlayerCorrelationID,
 				Blocks:                         legacymappings.Blocks(),
 				Items:                          legacymappings.Items(),
-				MultiPlayerCorrelationID:       pk.MultiPlayerCorrelationID,
 				GameRules: lo.SliceToMap(pk.GameRules, func(rule protocol.GameRule) (string, any) {
 					return rule.Name, rule.Value
 				}),
@@ -419,30 +423,50 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			},
 		}
 	case *packet.UpdateAbilities:
-		if len(pk.AbilityData.Layers) == 0 {
+		if len(pk.AbilityData.Layers) == 0 || pk.AbilityData.EntityUniqueID != conn.GameData().EntityUniqueID {
 			// We need at least one layer.
 			return nil
 		}
 
-		base, flags := pk.AbilityData.Layers[0].Values, uint32(0)
-		if base&protocol.AbilityAttackPlayers != 0 {
-			flags |= packet.AdventureSettingsFlagsNoPvM
-		}
-		if base&protocol.AbilityMayFly == 0 {
+		base, flags, perms := pk.AbilityData.Layers[0].Values, uint32(0), uint32(0)
+		if base&protocol.AbilityMayFly != 0 {
 			flags |= packet.AdventureFlagAllowFlight
+			if base&protocol.AbilityFlying != 0 {
+				flags |= packet.AdventureFlagFlying
+			}
 		}
-
-		if base&protocol.AbilityNoClip == 0 {
+		if base&protocol.AbilityNoClip != 0 {
 			flags |= packet.AdventureFlagNoClip
 		}
 
-		if base&protocol.AbilityFlying == 0 {
-			flags |= packet.AdventureFlagFlying
+		if base&protocol.AbilityBuild != 0 && base&protocol.AbilityMine != 0 {
+			flags |= packet.AdventureFlagWorldBuilder
+		} else {
+			flags |= packet.AdventureFlagWorldImmutable
+		}
+		if base&protocol.AbilityBuild != 0 {
+			perms |= packet.ActionPermissionBuild
+		}
+		if base&protocol.AbilityMine != 0 {
+			perms |= packet.ActionPermissionMine
 		}
 
+		if base&protocol.AbilityDoorsAndSwitches != 0 {
+			perms |= packet.ActionPermissionDoorsAndSwitches
+		}
+		if base&protocol.AbilityOpenContainers != 0 {
+			perms |= packet.ActionPermissionOpenContainers
+		}
+		if base&protocol.AbilityAttackPlayers != 0 {
+			perms |= packet.ActionPermissionAttackPlayers
+		}
+		if base&protocol.AbilityAttackMobs != 0 {
+			perms |= packet.ActionPermissionAttackMobs
+		}
 		return []packet.Packet{
 			&packet.AdventureSettings{
 				Flags:                  flags,
+				ActionPermissions:      perms,
 				PlayerUniqueID:         pk.AbilityData.EntityUniqueID,
 				CommandPermissionLevel: uint32(pk.AbilityData.CommandPermissions),
 				PermissionLevel:        uint32(pk.AbilityData.PlayerPermissions),
