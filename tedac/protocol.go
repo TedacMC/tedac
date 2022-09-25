@@ -49,20 +49,10 @@ func (Protocol) Encryption(key [32]byte) packet.Encryption {
 }
 
 // ConvertToLatest ...
-func (Protocol) ConvertToLatest(pk packet.Packet, conn *minecraft.Conn) []packet.Packet {
+func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
 	//fmt.Printf("1.12 -> 1.19.30: %T\n", pk)
 	switch pk := pk.(type) {
 	case *legacypacket.MovePlayer:
-		if conn.GameData().PlayerMovementSettings.MovementType != protocol.PlayerMovementModeClient {
-			return []packet.Packet{
-				&packet.PlayerAuthInput{
-					Pitch:    pk.Pitch,
-					Yaw:      pk.Yaw,
-					Position: pk.Position,
-					HeadYaw:  pk.HeadYaw,
-				},
-			}
-		}
 		return []packet.Packet{
 			&packet.MovePlayer{
 				EntityRuntimeID:       pk.EntityRuntimeID,

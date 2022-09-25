@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/df-mc/atomic"
+	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -55,7 +58,7 @@ func (a *App) ProxyingInfo() (ProxyInfo, error) {
 	}, nil
 }
 
-// StartRPC starts the Discord Rich Presence module of Tedac
+// startRPC starts the Discord Rich Presence module of Tedac
 func (a *App) startRPC() {
 	go func() {
 		a.rpc = true
@@ -134,22 +137,33 @@ func (a *App) startup(ctx context.Context) {
 }
 
 // defaultSkinResourcePatch holds the skin resource patch assigned to a player when they wear a custom skin.
-const defaultSkinResourcePatch = `{
+var defaultSkinResourcePatch = base64.StdEncoding.EncodeToString([]byte(`
+{
    "geometry" : {
       "default" : "geometry.humanoid.custom"
    }
 }
-`
+`))
 
 // handleConn handles a new incoming minecraft.Conn from the minecraft.Listener passed.
 func (a *App) handleConn(conn *minecraft.Conn) {
 	clientData := conn.ClientData()
 	if _, ok := conn.Protocol().(tedac.Protocol); ok { // TODO: Adjust this inside Protocol itself.
 		clientData.GameVersion = protocol.CurrentVersion
+		clientData.SkinResourcePatch = defaultSkinResourcePatch
 
-		clientData.SkinResourcePatch = base64.StdEncoding.EncodeToString([]byte(defaultSkinResourcePatch))
-		clientData.SkinImageHeight = 64
-		clientData.SkinImageWidth = 64
+		data, _ := base64.StdEncoding.DecodeString(clientData.SkinData)
+		switch len(data) {
+		case 32 * 64 * 4:
+			clientData.SkinImageHeight = 32
+			clientData.SkinImageWidth = 64
+		case 64 * 64 * 4:
+			clientData.SkinImageHeight = 64
+			clientData.SkinImageWidth = 64
+		case 128 * 128 * 4:
+			clientData.SkinImageHeight = 128
+			clientData.SkinImageWidth = 128
+		}
 	}
 
 	serverConn, err := minecraft.Dialer{
@@ -159,10 +173,13 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 	if err != nil {
 		panic(err)
 	}
+
+	data := serverConn.GameData()
+
 	var g sync.WaitGroup
 	g.Add(2)
 	go func() {
-		if err := conn.StartGame(serverConn.GameData()); err != nil {
+		if err := conn.StartGame(data); err != nil {
 			panic(err)
 		}
 		g.Done()
@@ -175,6 +192,71 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 	}()
 	g.Wait()
 
+	// TODO: Component-ize the shit below.
+	rid := data.EntityRuntimeID
+	oldMovementSystem := data.PlayerMovementSettings.MovementType == protocol.PlayerMovementModeClient
+	if _, ok := conn.Protocol().(tedac.Protocol); ok {
+		oldMovementSystem = true
+	}
+
+	pos := atomic.NewValue(data.PlayerPosition)
+	yaw, pitch := atomic.NewValue(data.Yaw), atomic.NewValue(data.Pitch)
+	startedSneaking, stoppedSneaking := atomic.NewValue(false), atomic.NewValue(false)
+	startedSprinting, stoppedSprinting := atomic.NewValue(false), atomic.NewValue(false)
+	startedGliding, stoppedGliding := atomic.NewValue(false), atomic.NewValue(false)
+	startedSwimming, stoppedSwimming := atomic.NewValue(false), atomic.NewValue(false)
+	startedJumping := atomic.NewValue(false)
+
+	if oldMovementSystem {
+		go func() {
+			t := time.NewTicker(time.Second / 20)
+			defer t.Stop()
+
+			for range t.C {
+				currentPos, currentYaw, currentPitch := pos.Load(), yaw.Load(), pitch.Load()
+
+				inputs := uint64(0)
+				if startedSneaking.CompareAndSwap(true, false) {
+					inputs |= packet.InputFlagStartSneaking
+				}
+				if stoppedSneaking.CompareAndSwap(true, false) {
+					inputs |= packet.InputFlagStopSneaking
+				}
+				if startedSprinting.CompareAndSwap(true, false) {
+					inputs |= packet.InputFlagStartSprinting
+				}
+				if stoppedSprinting.CompareAndSwap(true, false) {
+					inputs |= packet.InputFlagStopSprinting
+				}
+				if startedGliding.CompareAndSwap(true, false) {
+					inputs |= packet.InputFlagStartGliding
+				}
+				if stoppedGliding.CompareAndSwap(true, false) {
+					inputs |= packet.InputFlagStopGliding
+				}
+				if startedSwimming.CompareAndSwap(true, false) {
+					inputs |= packet.InputFlagStartSwimming
+				}
+				if stoppedSwimming.CompareAndSwap(true, false) {
+					inputs |= packet.InputFlagStopSwimming
+				}
+				if startedJumping.CompareAndSwap(true, false) {
+					inputs |= packet.InputFlagJumping
+				}
+
+				err := serverConn.WritePacket(&packet.PlayerAuthInput{
+					Position:  currentPos,
+					Pitch:     currentPitch,
+					Yaw:       currentYaw,
+					HeadYaw:   currentYaw,
+					InputData: inputs,
+				})
+				if err != nil {
+					return
+				}
+			}
+		}()
+	}
 	go func() {
 		defer a.listener.Disconnect(conn, "connection lost")
 		defer serverConn.Close()
@@ -182,6 +264,49 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 			pk, err := conn.ReadPacket()
 			if err != nil {
 				return
+			}
+			switch pk := pk.(type) {
+			case *packet.MovePlayer:
+				if !oldMovementSystem {
+					break
+				}
+				pos.Store(pk.Position)
+				yaw.Store(pk.Yaw)
+				pitch.Store(pk.Pitch)
+				continue
+			case *packet.PlayerAction:
+				if !oldMovementSystem {
+					break
+				}
+				switch pk.ActionType {
+				case legacypacket.PlayerActionJump:
+					startedJumping.Store(true)
+					continue
+				case legacypacket.PlayerActionStartSprint:
+					startedSprinting.Store(true)
+					continue
+				case legacypacket.PlayerActionStopSprint:
+					stoppedSprinting.Store(true)
+					continue
+				case legacypacket.PlayerActionStartSneak:
+					startedSneaking.Store(true)
+					continue
+				case legacypacket.PlayerActionStopSneak:
+					stoppedSneaking.Store(true)
+					continue
+				case legacypacket.PlayerActionStartSwimming:
+					startedSwimming.Store(true)
+					continue
+				case legacypacket.PlayerActionStopSwimming:
+					stoppedSwimming.Store(true)
+					continue
+				case legacypacket.PlayerActionStartGlide:
+					startedGliding.Store(true)
+					continue
+				case legacypacket.PlayerActionStopGlide:
+					stoppedGliding.Store(true)
+					continue
+				}
 			}
 			if err := serverConn.WritePacket(pk); err != nil {
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
@@ -204,10 +329,44 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 				return
 			}
 			switch pk := pk.(type) {
+			case *packet.MovePlayer:
+				if !oldMovementSystem {
+					break
+				}
+				if pk.EntityRuntimeID == rid {
+					pos.Store(pk.Position)
+					yaw.Store(pk.Yaw)
+					pitch.Store(pk.Pitch)
+				}
+			case *packet.MoveActorAbsolute:
+				if !oldMovementSystem {
+					break
+				}
+				if pk.EntityRuntimeID == rid {
+					pos.Store(pk.Position)
+					yaw.Store(pk.Rotation[2])
+					pitch.Store(pk.Rotation[0])
+				}
+			case *packet.MoveActorDelta:
+				if !oldMovementSystem {
+					break
+				}
+				if pk.EntityRuntimeID == rid {
+					pos.Store(pk.Position)
+					yaw.Store(pk.Rotation[2])
+					pitch.Store(pk.Rotation[0])
+				}
 			case *packet.SubChunk:
-				// TODO: Re-encode the sub chunk to the correct format.
+				if _, ok := conn.Protocol().(tedac.Protocol); ok {
+					// TODO
+					continue
+				}
 			case *packet.LevelChunk:
 				if pk.SubChunkRequestMode != protocol.SubChunkRequestModeLegacy {
+					if _, ok := conn.Protocol().(tedac.Protocol); !ok {
+						// Only Tedac clients should receive the new format.
+						continue
+					}
 					max := world.Overworld.Range().Height() >> 4
 					if pk.SubChunkRequestMode == protocol.SubChunkRequestModeLimited {
 						max = int(pk.HighestSubChunk)
@@ -246,18 +405,14 @@ func tokenSource() oauth2.TokenSource {
 	if err == nil {
 		_ = json.Unmarshal(tokenData, token)
 	} else {
-		token, err = requestToken()
+		token = requestToken()
 	}
 	src := auth.RefreshTokenSource(token)
 	_, err = src.Token()
 	if err != nil {
 		// The cached refresh token expired and can no longer be used to obtain a new token. We require the
 		// user to log in again and use that token instead.
-		token, err = requestToken()
-		if err != nil {
-			panic(err)
-		}
-		src = auth.RefreshTokenSource(token)
+		src = auth.RefreshTokenSource(requestToken())
 	}
 	tok, _ := src.Token()
 	b, _ := json.Marshal(tok)
@@ -266,24 +421,25 @@ func tokenSource() oauth2.TokenSource {
 }
 
 // requestToken opens a new WebView2 window and requests the user to log in. The token is returned if successful.
-func requestToken() (*oauth2.Token, error) {
+func requestToken() *oauth2.Token {
 	resp, err := auth.StartDeviceAuth()
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	webview.NewWebview(webview.Settings{
+	view := webview.NewWebview(webview.Settings{
 		Title:  "Tedac Authentication",
 		URL:    "https://login.live.com/oauth20_remoteconnect.srf?lc=1033&otc=" + resp.UserCode,
 		Width:  500,
 		Height: 600,
-	}).Run()
+	})
+	view.Run()
 
 	t, err := auth.PollDeviceAuth(resp.DeviceCode)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	if t == nil {
-		return nil, errors.New("no token received")
+		panic(err)
 	}
-	return t, nil
+	return t
 }

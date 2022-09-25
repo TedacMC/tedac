@@ -6,24 +6,24 @@ import (
 	"github.com/hugolgst/rich-go/client"
 )
 
-const DISCORD_ID = "710885082100924416"
+const discordId = "710885082100924416"
 
 func rpc(address string) {
-	err := client.Login(DISCORD_ID)
+	err := client.Login(discordId)
 	if err != nil {
 		panic(err)
 	}
 
-	time := time.Now()
+	t := time.Now()
 	err = client.SetActivity(client.Activity{
 		State:      address,
-		Details:    "Playing MCBE on 1.12",
+		Details:    "Playing Minecraft: Bedrock Edition on 1.12",
 		LargeImage: "tedac",
 		LargeText:  "TedacMC",
 		SmallImage: "mc",
 		SmallText:  "Minecraft 1.12 Support",
 		Timestamps: &client.Timestamps{
-			Start: &time,
+			Start: &t,
 		},
 	})
 
