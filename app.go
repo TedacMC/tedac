@@ -314,7 +314,6 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 				}
 				return
 			}
-			_ = serverConn.Flush()
 		}
 	}()
 	go func() {
@@ -392,7 +391,6 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 			if err := conn.WritePacket(pk); err != nil {
 				return
 			}
-			_ = conn.Flush()
 		}
 	}()
 }
