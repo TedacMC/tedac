@@ -12,7 +12,7 @@ const discordID = "710885082100924416"
 func (a *App) startRPC() {
 	err := client.Login(discordID)
 	if err != nil {
-		panic(err)
+		return
 	}
 
 	start := time.Now()
@@ -33,7 +33,7 @@ func (a *App) startRPC() {
 				},
 			})
 			if err != nil {
-				panic(err)
+				return
 			}
 		case <-a.c:
 			return
