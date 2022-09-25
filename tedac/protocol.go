@@ -157,18 +157,14 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				ServerSide: false,
 			},
 		}
+	case *packet.AdventureSettings:
+		// TODO: Send request ability instead?
+		return nil
 	}
 
 	if pk.ID() == 37 { // TODO: This is so fucking ugly why just why
-		return []packet.Packet{}
+		return nil
 	}
-
-	latest := packet.NewPool()
-	if _, ok := latest[pk.ID()]; !ok {
-		// This means that the packet does not exist on latest and we shouldn't send it
-		return []packet.Packet{}
-	}
-
 	return []packet.Packet{pk}
 }
 
