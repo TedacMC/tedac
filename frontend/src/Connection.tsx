@@ -8,7 +8,7 @@ function Connection() {
     const navigate = useNavigate()
 
     const [proxyingInfo, setProxyingInfo] = useState<main.ProxyInfo>({
-        local_address: "loading...", remote_address: "loading...",
+        local_address: "", remote_address: "",
     })
     useEffect(() => {
         ProxyingInfo()

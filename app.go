@@ -32,13 +32,12 @@ type App struct {
 	src oauth2.TokenSource
 	ctx context.Context
 
-	rpc     bool
-	rpcChan chan interface{}
+	c chan interface{}
 }
 
 // NewApp creates a new App application struct.
 func NewApp() *App {
-	return &App{src: tokenSource(), rpcChan: make(chan interface{})}
+	return &App{src: tokenSource(), c: make(chan interface{})}
 }
 
 // ProxyInfo ...
@@ -58,31 +57,12 @@ func (a *App) ProxyingInfo() (ProxyInfo, error) {
 	}, nil
 }
 
-// startRPC starts the Discord Rich Presence module of Tedac
-func (a *App) startRPC() {
-	go func() {
-		a.rpc = true
-		for {
-			select {
-			case <-a.rpcChan:
-				a.rpc = false
-				return
-			default:
-				if a.rpc {
-					rpc(a.remoteAddress)
-					a.rpc = false
-				}
-			}
-		}
-	}()
-}
-
 // Terminate terminates any existing Tedac connection.
 func (a *App) Terminate() {
 	if a.listener == nil {
 		return
 	}
-	a.rpcChan <- struct{}{}
+	a.c <- struct{}{}
 	_ = a.listener.Close()
 }
 
@@ -110,7 +90,7 @@ func (a *App) Connect(address string) error {
 	a.remoteAddress = address
 	a.localPort = uint16(port)
 
-	a.startRPC()
+	go a.startRPC()
 
 	a.listener, err = minecraft.ListenConfig{
 		StatusProvider:    p,
