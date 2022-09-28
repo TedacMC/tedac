@@ -1,26 +1,29 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/df-mc/atomic"
+	"github.com/df-mc/dragonfly/server/world"
+	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/auth"
+	"github.com/sandertv/gophertunnel/minecraft/nbt"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/tedacmc/tedac/tedac"
+	"github.com/tedacmc/tedac/tedac/chunk"
+	"github.com/tedacmc/tedac/tedac/latestmappings"
 	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
+	"github.com/wailsapp/wails/lib/renderer/webview"
+	"golang.org/x/oauth2"
 	"net"
 	"os"
 	"sync"
 	"time"
-
-	"github.com/df-mc/dragonfly/server/world"
-	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sandertv/gophertunnel/minecraft/auth"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/tedacmc/tedac/tedac"
-	"github.com/wailsapp/wails/lib/renderer/webview"
-	"golang.org/x/oauth2"
 )
 
 // App ...
@@ -116,14 +119,18 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
-// defaultSkinResourcePatch holds the skin resource patch assigned to a player when they wear a custom skin.
-var defaultSkinResourcePatch = base64.StdEncoding.EncodeToString([]byte(`
-{
-   "geometry" : {
-      "default" : "geometry.humanoid.custom"
-   }
-}
-`))
+var (
+	// airRID is the runtime ID of the air block in the latest version of the game.
+	airRID, _ = latestmappings.StateToRuntimeID("minecraft:air", nil)
+	// defaultSkinResourcePatch holds the skin resource patch assigned to a player when they wear a custom skin.
+	defaultSkinResourcePatch = base64.StdEncoding.EncodeToString([]byte(`
+		{
+		   "geometry" : {
+		      "default" : "geometry.humanoid.custom"
+		   }
+		}
+	`))
+)
 
 // handleConn handles a new incoming minecraft.Conn from the minecraft.Listener passed.
 func (a *App) handleConn(conn *minecraft.Conn) {
@@ -179,13 +186,18 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 		oldMovementSystem = true
 	}
 
+	r := world.Overworld.Range()
 	pos := atomic.NewValue(data.PlayerPosition)
+	lastPos := atomic.NewValue(data.PlayerPosition)
 	yaw, pitch := atomic.NewValue(data.Yaw), atomic.NewValue(data.Pitch)
+
 	startedSneaking, stoppedSneaking := atomic.NewValue(false), atomic.NewValue(false)
 	startedSprinting, stoppedSprinting := atomic.NewValue(false), atomic.NewValue(false)
 	startedGliding, stoppedGliding := atomic.NewValue(false), atomic.NewValue(false)
 	startedSwimming, stoppedSwimming := atomic.NewValue(false), atomic.NewValue(false)
 	startedJumping := atomic.NewValue(false)
+
+	biomeBufferCache := make(map[protocol.ChunkPos][]byte)
 
 	if oldMovementSystem {
 		go func() {
@@ -193,7 +205,10 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 			defer t.Stop()
 
 			for range t.C {
-				currentPos, currentYaw, currentPitch := pos.Load(), yaw.Load(), pitch.Load()
+				currentPos, originalPos := pos.Load(), lastPos.Load()
+				lastPos.Store(currentPos)
+
+				currentYaw, currentPitch := yaw.Load(), pitch.Load()
 
 				inputs := uint64(0)
 				if startedSneaking.CompareAndSwap(true, false) {
@@ -226,10 +241,12 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 
 				err := serverConn.WritePacket(&packet.PlayerAuthInput{
 					Position:  currentPos,
+					Delta:     currentPos.Sub(originalPos),
 					Pitch:     currentPitch,
 					Yaw:       currentYaw,
 					HeadYaw:   currentYaw,
 					InputData: inputs,
+					InputMode: packet.InputModeMouse,
 				})
 				if err != nil {
 					return
@@ -336,26 +353,76 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 					pitch.Store(pk.Rotation[0])
 				}
 			case *packet.SubChunk:
-				if _, ok := conn.Protocol().(tedac.Protocol); ok {
-					// TODO
+				if _, ok := conn.Protocol().(tedac.Protocol); !ok {
+					// Only Tedac clients should receive the old format.
 					continue
 				}
+
+				chunkBuf := bytes.NewBuffer(nil)
+				blockEntities := make([]map[string]any, 0)
+				for _, entry := range pk.SubChunkEntries {
+					if entry.Result != protocol.SubChunkResultSuccess {
+						chunkBuf.Write([]byte{
+							chunk.SubChunkVersion,
+							0, // The client will treat this as all air.
+							uint8(entry.Offset[1]),
+						})
+						continue
+					}
+
+					var ind uint8
+					readBuf := bytes.NewBuffer(entry.RawPayload)
+					sub, err := chunk.DecodeSubChunk(airRID, r, readBuf, &ind, chunk.NetworkEncoding)
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
+
+					var blockEntity map[string]any
+					dec := nbt.NewDecoderWithEncoding(readBuf, nbt.NetworkLittleEndian)
+					for {
+						if err := dec.Decode(&blockEntity); err != nil {
+							break
+						}
+						blockEntities = append(blockEntities, blockEntity)
+					}
+
+					chunkBuf.Write(chunk.EncodeSubChunk(sub, chunk.NetworkEncoding, r, int(ind)))
+				}
+
+				chunkPos := protocol.ChunkPos{pk.Position.X(), pk.Position.Z()}
+				_, _ = chunkBuf.Write(append(biomeBufferCache[chunkPos], 0))
+				delete(biomeBufferCache, chunkPos)
+
+				enc := nbt.NewEncoderWithEncoding(chunkBuf, nbt.NetworkLittleEndian)
+				for _, b := range blockEntities {
+					_ = enc.Encode(b)
+				}
+
+				_ = conn.WritePacket(&packet.LevelChunk{
+					Position:      chunkPos,
+					SubChunkCount: uint32(len(pk.SubChunkEntries)),
+					RawPayload:    append([]byte(nil), chunkBuf.Bytes()...),
+				})
+				continue
 			case *packet.LevelChunk:
 				if pk.SubChunkRequestMode != protocol.SubChunkRequestModeLegacy {
 					if _, ok := conn.Protocol().(tedac.Protocol); !ok {
-						// Only Tedac clients should receive the new format.
+						// Only Tedac clients should receive the old format.
 						continue
 					}
-					max := world.Overworld.Range().Height() >> 4
+
+					max := r.Height() >> 4
 					if pk.SubChunkRequestMode == protocol.SubChunkRequestModeLimited {
 						max = int(pk.HighestSubChunk)
 					}
 
 					offsets := make([]protocol.SubChunkOffset, 0, max)
 					for i := 0; i < max; i++ {
-						offsets = append(offsets, protocol.SubChunkOffset{0, int8(i), 0})
+						offsets = append(offsets, protocol.SubChunkOffset{0, int8(i + (r[0] >> 4)), 0})
 					}
 
+					biomeBufferCache[pk.Position] = pk.RawPayload[:len(pk.RawPayload)-1]
 					_ = serverConn.WritePacket(&packet.SubChunkRequest{
 						Position: protocol.SubChunkPos{pk.Position.X(), 0, pk.Position.Z()},
 						Offsets:  offsets,

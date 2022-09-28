@@ -49,6 +49,9 @@ func (Protocol) Encryption(key [32]byte) packet.Encryption {
 	return newCFBEncryption(key[:])
 }
 
+// nullBytes contains the word 'null' converted to a byte slice.
+var nullBytes = []byte("null\n")
+
 // ConvertToLatest ...
 func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
 	//fmt.Printf("1.12 -> 1.19.30: %T\n", pk)
@@ -131,10 +134,14 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 			},
 		}
 	case *legacypacket.ModalFormResponse:
+		var response protocol.Optional[[]byte]
+		if !bytes.Equal(pk.ResponseData, nullBytes) {
+			response = protocol.Option(pk.ResponseData)
+		}
 		return []packet.Packet{
 			&packet.ModalFormResponse{
 				FormID:       pk.FormID,
-				ResponseData: protocol.Option(pk.ResponseData),
+				ResponseData: response,
 			},
 		}
 	case *legacypacket.MobEquipment:
@@ -144,13 +151,10 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				NewItem:         protocol.ItemInstance{Stack: upgradeItem(pk.NewItem)},
 				InventorySlot:   pk.InventorySlot,
 				HotBarSlot:      pk.HotBarSlot,
-				WindowID:        pk.HotBarSlot,
+				WindowID:        pk.WindowID,
 			},
 		}
 	case *legacypacket.ContainerClose:
-		if pk.WindowID == 255 {
-			pk.WindowID = 1
-		}
 		return []packet.Packet{
 			&packet.ContainerClose{
 				WindowID:   pk.WindowID,
@@ -252,6 +256,14 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				Position:      pk.Position,
 				RawPayload:    append(writeBuf.Bytes(), buf.Bytes()...),
 				SubChunkCount: uint32(len(data.SubChunks)),
+			},
+		}
+	case *packet.GameRulesChanged:
+		return []packet.Packet{
+			&legacypacket.GameRulesChanged{
+				GameRules: lo.SliceToMap(pk.GameRules, func(rule protocol.GameRule) (string, any) {
+					return rule.Name, rule.Value
+				}),
 			},
 		}
 	case *packet.UpdateBlock:
@@ -557,16 +569,15 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			pk.EventData = int32(downgradeBlockRuntimeID(uint32(pk.EventData)))
 		}
 	case *packet.AvailableCommands:
-		cmds := []legacyprotocol.Command{}
+		var cmds []legacyprotocol.Command
 		for _, c := range pk.Commands {
-			overloads := []legacyprotocol.CommandOverload{}
+			var overloads []legacyprotocol.CommandOverload
 			for _, o := range c.Overloads {
-				params := []legacyprotocol.CommandParameter{}
+				var params []legacyprotocol.CommandParameter
 				for _, p := range o.Parameters {
-					cmdType := p.Type
 					params = append(params, legacyprotocol.CommandParameter{
 						Name:                p.Name,
-						Type:                cmdType,
+						Type:                p.Type,
 						Optional:            p.Optional,
 						CollapseEnumOptions: true,
 						Enum:                legacyprotocol.CommandEnum(p.Enum),
@@ -588,7 +599,27 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 		}
 		return []packet.Packet{
 			&legacypacket.AvailableCommands{
-				Commands: cmds,
+				Commands: lo.Map(pk.Commands, func(c protocol.Command, _ int) legacyprotocol.Command {
+					return legacyprotocol.Command{
+						Name:            c.Name,
+						Description:     c.Description,
+						Flags:           byte(c.Flags),
+						PermissionLevel: c.PermissionLevel,
+						Aliases:         c.Aliases,
+						Overloads: lo.Map(c.Overloads, func(o protocol.CommandOverload, i int) legacyprotocol.CommandOverload {
+							return legacyprotocol.CommandOverload{Parameters: lo.Map(o.Parameters, func(p protocol.CommandParameter, _ int) legacyprotocol.CommandParameter {
+								return legacyprotocol.CommandParameter{
+									Name:                p.Name,
+									Type:                p.Type,
+									Optional:            p.Optional,
+									CollapseEnumOptions: true,
+									Enum:                legacyprotocol.CommandEnum(p.Enum),
+									Suffix:              p.Suffix,
+								}
+							})}
+						}),
+					}
+				}),
 			},
 		}
 	case *packet.CreativeContent:
@@ -602,7 +633,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 		}
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == 113 || pk.SoundType == 145 || pk.SoundType == 151 || pk.SoundType <= 198 && pk.SoundType >= 195 || pk.SoundType == 222 || pk.SoundType == 227 {
-			return []packet.Packet{}
+			return nil
 		}
 	case *packet.PlayerSkin:
 		var patch struct {

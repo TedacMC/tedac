@@ -10,10 +10,15 @@ import (
 	"strings"
 )
 
-// CurrentBlockVersion is the current version of blocks (states) of the game. This version is composed
-// of 4 bytes indicating a version, interpreted as a big endian int. The current version represents
-// 1.16.0.14 {1, 16, 0, 14}.
-const CurrentBlockVersion int32 = 17825806
+const (
+	// SubChunkVersion is the current version of the written sub chunks, specifying the format they are
+	// written on disk and over network.
+	SubChunkVersion = 9
+	// CurrentBlockVersion is the current version of blocks (states) of the game. This version is composed
+	// of 4 bytes indicating a version, interpreted as a big endian int. The current version represents
+	// 1.16.0.14 {1, 16, 0, 14}.
+	CurrentBlockVersion int32 = 17825806
+)
 
 type (
 	// Encoding is an encoding type used for Chunk encoding. Implementations of this interface are DiskEncoding and
