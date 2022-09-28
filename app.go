@@ -7,20 +7,19 @@ import (
 	"errors"
 	"fmt"
 	"github.com/df-mc/atomic"
-	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
-	"net"
-	"os"
-	"sync"
-	"time"
-
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/tedacmc/tedac/tedac"
+	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
 	"github.com/wailsapp/wails/lib/renderer/webview"
 	"golang.org/x/oauth2"
+	"net"
+	"os"
+	"sync"
+	"time"
 )
 
 // App ...
@@ -294,6 +293,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 				}
 				return
 			}
+			_ = serverConn.Flush()
 		}
 	}()
 	go func() {
@@ -371,6 +371,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 			if err := conn.WritePacket(pk); err != nil {
 				return
 			}
+			_ = conn.Flush()
 		}
 	}()
 }
