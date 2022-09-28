@@ -35,13 +35,23 @@ function Home() {
                             IP Address
                         </label>
                         <input type="text" id="ip" autoComplete={"off"} value={address}
-                               onFocus={() => setShowServers(true)}
+                               onFocus={() => {
+                                   if (!connectionButton) {
+                                       // We're connecting, so don't allow the user to change the address.
+                                        return
+                                   }
+                                   setShowServers(true)
+                               }}
                                onBlur={(e) => {
                                    if (e.relatedTarget === null) {
                                        setShowServers(false);
                                    }
                                }}
                                onChange={(e) => {
+                                   if (!connectionButton) {
+                                       // We're connecting, so don't allow the user to change the address.
+                                       return
+                                   }
                                    setAddress(e.target.value);
                                    setShowServers(false);
                                }}
@@ -83,7 +93,13 @@ function Home() {
                             Port
                         </label>
                         <input type="text" id="port" autoComplete={"off"} value={port}
-                               onChange={(e) => setPort(e.target.value)}
+                               onChange={(e) => {
+                                   if (!connectionButton) {
+                                       // We're connecting, so don't allow the user to change the port.
+                                       return
+                                   }
+                                   setPort(e.target.value)
+                               }}
                                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                                required></input>
                     </div>

@@ -135,13 +135,19 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 		}
 	case *legacypacket.ModalFormResponse:
 		var response protocol.Optional[[]byte]
+		var cancelReason protocol.Optional[uint8]
 		if !bytes.Equal(pk.ResponseData, nullBytes) {
+			// The response data is not null, so it is a valid response.
 			response = protocol.Option(pk.ResponseData)
+		} else {
+			// We can always default to the user closed reason if the response data doesn't exist.
+			cancelReason = protocol.Option[uint8](packet.ModalFormCancelReasonUserClosed)
 		}
 		return []packet.Packet{
 			&packet.ModalFormResponse{
 				FormID:       pk.FormID,
 				ResponseData: response,
+				CancelReason: cancelReason,
 			},
 		}
 	case *legacypacket.MobEquipment:
