@@ -90,6 +90,15 @@ func (a *App) Connect(address string) error {
 		return err
 	}
 
+	conn, err := minecraft.Dialer{
+		TokenSource: a.src,
+	}.Dial("raknet", address)
+	if err != nil {
+		return err
+	}
+	packs := conn.ResourcePacks()
+	_ = conn.Close()
+
 	a.remoteAddress = address
 	a.localPort = uint16(port)
 
@@ -97,6 +106,7 @@ func (a *App) Connect(address string) error {
 
 	a.listener, err = minecraft.ListenConfig{
 		StatusProvider:    p,
+		ResourcePacks:     packs,
 		AcceptedProtocols: []minecraft.Protocol{tedac.Protocol{}},
 	}.Listen("raknet", fmt.Sprintf(":%d", port))
 	if err != nil {
@@ -251,6 +261,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 				if err != nil {
 					return
 				}
+				_ = serverConn.Flush()
 			}
 		}()
 	}
@@ -311,6 +322,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 				}
 				return
 			}
+			_ = serverConn.Flush()
 		}
 	}()
 	go func() {
@@ -404,6 +416,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 					SubChunkCount: uint32(len(pk.SubChunkEntries)),
 					RawPayload:    append([]byte(nil), chunkBuf.Bytes()...),
 				})
+				_ = conn.Flush()
 				continue
 			case *packet.LevelChunk:
 				if pk.SubChunkRequestMode != protocol.SubChunkRequestModeLegacy {
@@ -427,6 +440,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 						Position: protocol.SubChunkPos{pk.Position.X(), 0, pk.Position.Z()},
 						Offsets:  offsets,
 					})
+					_ = serverConn.Flush()
 					continue
 				}
 			case *packet.Transfer:
@@ -438,6 +452,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 			if err := conn.WritePacket(pk); err != nil {
 				return
 			}
+			_ = conn.Flush()
 		}
 	}()
 }

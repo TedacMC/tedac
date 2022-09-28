@@ -569,34 +569,6 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			pk.EventData = int32(downgradeBlockRuntimeID(uint32(pk.EventData)))
 		}
 	case *packet.AvailableCommands:
-		var cmds []legacyprotocol.Command
-		for _, c := range pk.Commands {
-			var overloads []legacyprotocol.CommandOverload
-			for _, o := range c.Overloads {
-				var params []legacyprotocol.CommandParameter
-				for _, p := range o.Parameters {
-					params = append(params, legacyprotocol.CommandParameter{
-						Name:                p.Name,
-						Type:                p.Type,
-						Optional:            p.Optional,
-						CollapseEnumOptions: true,
-						Enum:                legacyprotocol.CommandEnum(p.Enum),
-						Suffix:              p.Suffix,
-					})
-				}
-				overloads = append(overloads, legacyprotocol.CommandOverload{
-					Parameters: params,
-				})
-			}
-			cmds = append(cmds, legacyprotocol.Command{
-				Name:            c.Name,
-				Description:     c.Description,
-				Flags:           byte(c.Flags),
-				PermissionLevel: c.PermissionLevel,
-				Aliases:         c.Aliases,
-				Overloads:       overloads,
-			})
-		}
 		return []packet.Packet{
 			&legacypacket.AvailableCommands{
 				Commands: lo.Map(pk.Commands, func(c protocol.Command, _ int) legacyprotocol.Command {
