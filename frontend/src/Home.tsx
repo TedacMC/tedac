@@ -5,6 +5,7 @@ import {useState} from "react";
 import {useNavigate} from "react-router-dom";
 
 import zeqaLogo from '../logos/zeqa.jpg';
+import vasarLogo from '../logos/vasar.jpg';
 
 function Home() {
     const navigate = useNavigate()
@@ -28,8 +29,8 @@ function Home() {
                 </p>
             </div>
             <div className="mt-10">
-                <div className="grid gap-6 max-w-md mb-8 md:grid-rows-2">
-                    <div>
+                <div className="grid gap-6 mb-8 md:grid-rows-2">
+                    <div className={"max-w-md"}>
                         <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-300">
                             IP Address
                         </label>
@@ -45,43 +46,39 @@ function Home() {
                                    setShowServers(false);
                                }}
                                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                               placeholder="ganja.bet" required></input>
+                               placeholder="zeqa.net" required></input>
                         {showServers ?
                             <div
                                 tabIndex={0}
-                                className="grid grid-cols-2 grid-rows-2 grid-flow-col gap-y-2 gap-x-2 mt-2 font-extrabold text-md bg-slate-700 shadow-lg rounded-lg absolute">
+                                className="grid grid-cols-1 grid-rows-2 grid-flow-col gap-x-2 mt-2 bg-slate-700 shadow-lg rounded-lg absolute">
                                 <button
-                                    className="px-2.5 py-2.5 flex flew-row items-center bg-transparent hover:bg-slate-800"
+                                    className="pl-2.5 py-2.5 pr-32 flex flew-row items-center bg-transparent rounded-lg hover:bg-slate-800"
                                     onClick={() => {
                                         setAddress("zeqa.net");
                                         setShowServers(false);
                                     }}>
-                                    <img className="rounded-lg max-h-20" src={zeqaLogo}/>
-                                    <p className="px-3">Zeqa</p>
+                                    <img className="rounded-lg max-h-16 max-w-16" src={zeqaLogo}/>
+                                    <div className="ml-3 text-left">
+                                        <p className="font-extrabold text-md">Zeqa</p>
+                                        <p className="text-sm">zeqa.net</p>
+                                    </div>
                                 </button>
                                 <button
-                                    className="dropdown-item px-2.5 py-2.5 flex flex-row items-center bg-transparent hover:bg-slate-800"
+                                    className="pl-2.5 py-2.5 pr-32 flex flex-row items-center rounded-lg bg-transparent hover:bg-slate-800"
                                     onClick={() => {
-                                        setAddress("ganja.bet");
+                                        setAddress("vasar.land");
                                         setShowServers(false);
                                     }}>
-                                    <img className="rounded-lg max-h-20" src={zeqaLogo}/>
-                                    <p className="px-3">Ganja</p>
-                                </button>
-                                <button
-                                    className="dropdown-item px-2.5 py-2.5 flex flex-row items-center bg-transparent hover:bg-slate-800">
-                                    <img className="rounded-lg max-h-20" src={zeqaLogo}/>
-                                    <p className="px-3">Ectary</p>
-                                </button>
-                                <button
-                                    className="dropdown-item px-2.5 py-2.5 flex flex-row items-center bg-transparent hover:bg-slate-800">
-                                    <img className="rounded-lg max-h-20" src={zeqaLogo}/>
-                                    <p className="px-3">Galaxite</p>
+                                    <img className="rounded-lg max-h-16" src={vasarLogo}/>
+                                    <div className="ml-3 text-left">
+                                        <p className="font-extrabold text-md">Vasar</p>
+                                        <p className="text-sm">vasar.land</p>
+                                    </div>
                                 </button>
                             </div>
                             : null}
                     </div>
-                    <div>
+                    <div className={"max-w-xs"}>
                         <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-300">
                             Port
                         </label>

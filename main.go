@@ -17,7 +17,7 @@ func main() {
 	// Create application with options
 	err := wails.Run(&options.App{
 		Title:         "Tedac",
-		Width:         902,
+		Width:         905,
 		Height:        500,
 		Frameless:     true,
 		DisableResize: true,
