@@ -40,5 +40,5 @@ func checkNetIsolation() {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	data, _ := exec.Command("CheckNetIsolation", "LoopbackExempt", "-s", `-n="microsoft.minecraftuwp_8wekyb3d8bbwe"`).CombinedOutput()
+	_ = exec.Command("CheckNetIsolation", "LoopbackExempt", "-a", `-n="microsoft.minecraftuwp_8wekyb3d8bbwe"`).Run()
 }
