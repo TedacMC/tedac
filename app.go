@@ -22,6 +22,8 @@ import (
 	"golang.org/x/oauth2"
 	"net"
 	"os"
+	"os/exec"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -122,6 +124,17 @@ func (a *App) Connect(address string) error {
 		}
 	}()
 	return nil
+}
+
+// CheckNetIsolation checks if a loopback exempt is in place to allow the hosting device to join the server. This is
+// only relevant on Windows.
+func (a *App) CheckNetIsolation() bool {
+	if runtime.GOOS != "windows" {
+		// Only an issue on Windows.
+		return true
+	}
+	data, _ := exec.Command("CheckNetIsolation", "LoopbackExempt", "-s", `-n="microsoft.minecraftuwp_8wekyb3d8bbwe"`).CombinedOutput()
+	return bytes.Contains(data, []byte("microsoft.minecraftuwp_8wekyb3d8bbwe"))
 }
 
 // startup is called when the app starts. The context is saved, so we can call the runtime methods.
