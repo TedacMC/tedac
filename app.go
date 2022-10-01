@@ -7,6 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"os"
+	"sync"
+	"time"
+
 	"github.com/df-mc/atomic"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -14,16 +19,13 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/sandertv/gophertunnel/minecraft/resource"
 	"github.com/tedacmc/tedac/tedac"
 	"github.com/tedacmc/tedac/tedac/chunk"
 	"github.com/tedacmc/tedac/tedac/latestmappings"
 	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
 	"github.com/wailsapp/wails/lib/renderer/webview"
 	"golang.org/x/oauth2"
-	"net"
-	"os"
-	"sync"
-	"time"
 )
 
 // App ...
@@ -90,19 +92,12 @@ func (a *App) Connect(address string) error {
 		return err
 	}
 
-	conn, err := minecraft.Dialer{
-		TokenSource: a.src,
-	}.Dial("raknet", address)
-	if err != nil {
-		return err
-	}
-	packs := conn.ResourcePacks()
-	_ = conn.Close()
-
 	a.remoteAddress = address
 	a.localPort = uint16(port)
 
 	go a.startRPC()
+
+	packs := resourcePacks(address)
 
 	a.listener, err = minecraft.ListenConfig{
 		StatusProvider:    p,
@@ -509,4 +504,45 @@ func requestToken() *oauth2.Token {
 		panic(err)
 	}
 	return t
+}
+
+// resourcePack returns a resource pack to use on a respective server. It either reads it from the
+// packs folder if cached or requests it from the server via dialing.
+func resourcePacks(address string) []*resource.Pack {
+	packID := base64.StdEncoding.EncodeToString([]byte(address))
+	var packs []*resource.Pack
+	packData, err := os.ReadFile("packs/" + packID)
+	if err != nil {
+		packs = requestPacks(address)
+	} else {
+		pack, err := resource.FromBytes(packData)
+		if err != nil {
+			// Shouldn't happen unless pack got corrupted
+			packs = requestPacks(address)
+		} else {
+			packs = append(packs, pack)
+		}
+	}
+	for _, pack := range packs {
+		_ = os.Mkdir("packs", 0644)
+		b := make([]byte, pack.Len())
+		pack.ReadAt(b, 0)
+		_ = os.WriteFile("packs/"+packID, b, 0644)
+	}
+	return packs
+}
+
+// requestPack dials a server in order to obtain its resource pack
+func requestPacks(address string) []*resource.Pack {
+	conn, err := minecraft.Dialer{
+		TokenSource: tokenSource(),
+	}.Dial("raknet", address)
+	if err != nil {
+		return nil
+	}
+	packs := conn.ResourcePacks()
+	_ = conn.Close()
+
+	return packs
+
 }
