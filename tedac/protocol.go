@@ -305,28 +305,8 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			},
 		}
 	case *packet.AddActor:
-		var attributes []legacyprotocol.Attribute
-		for _, a := range pk.Attributes {
-			attributes = append(attributes, legacyprotocol.Attribute{
-				Name:  a.Name,
-				Value: a.Value,
-				Max:   a.Max,
-				Min:   a.Min,
-			})
-		}
-		var links []legacyprotocol.EntityLink
-		for _, l := range pk.EntityLinks {
-			links = append(links, legacyprotocol.EntityLink{
-				RiddenEntityUniqueID: l.RiddenEntityUniqueID,
-				RiderEntityUniqueID:  l.RiddenEntityUniqueID,
-				Type:                 l.Type,
-				Immediate:            l.Immediate,
-			})
-		}
 		return []packet.Packet{
 			&legacypacket.AddActor{
-				Attributes:      attributes,
-				EntityLinks:     links,
 				EntityMetadata:  pk.EntityMetadata,
 				EntityRuntimeID: pk.EntityRuntimeID,
 				EntityType:      pk.EntityType,
@@ -336,18 +316,25 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				Position:        pk.Position,
 				Velocity:        pk.Velocity,
 				Yaw:             pk.Yaw,
+				Attributes: lo.Map(pk.Attributes, func(a protocol.AttributeValue, _ int) legacyprotocol.Attribute {
+					return legacyprotocol.Attribute{
+						Name:  a.Name,
+						Value: a.Value,
+						Max:   a.Max,
+						Min:   a.Min,
+					}
+				}),
+				EntityLinks: lo.Map(pk.EntityLinks, func(l protocol.EntityLink, _ int) legacyprotocol.EntityLink {
+					return legacyprotocol.EntityLink{
+						Type:                 l.Type,
+						RiddenEntityUniqueID: l.RiddenEntityUniqueID,
+						RiderEntityUniqueID:  l.RiddenEntityUniqueID,
+						Immediate:            l.Immediate,
+					}
+				}),
 			},
 		}
 	case *packet.AddPlayer:
-		var links []legacyprotocol.EntityLink
-		for _, l := range pk.EntityLinks {
-			links = append(links, legacyprotocol.EntityLink{
-				RiddenEntityUniqueID: l.RiddenEntityUniqueID,
-				RiderEntityUniqueID:  l.RiddenEntityUniqueID,
-				Type:                 l.Type,
-				Immediate:            l.Immediate,
-			})
-		}
 		return []packet.Packet{
 			&legacypacket.AddPlayer{
 				UUID:                   pk.UUID,
@@ -364,8 +351,15 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				EntityMetadata:         pk.EntityMetadata,
 				CommandPermissionLevel: uint32(pk.AbilityData.CommandPermissions),
 				PermissionLevel:        uint32(pk.AbilityData.PlayerPermissions),
-				EntityLinks:            links,
 				DeviceID:               pk.DeviceID,
+				EntityLinks: lo.Map(pk.EntityLinks, func(l protocol.EntityLink, _ int) legacyprotocol.EntityLink {
+					return legacyprotocol.EntityLink{
+						Type:                 l.Type,
+						RiddenEntityUniqueID: l.RiddenEntityUniqueID,
+						RiderEntityUniqueID:  l.RiddenEntityUniqueID,
+						Immediate:            l.Immediate,
+					}
+				}),
 			},
 		}
 	case *packet.MobEquipment:
@@ -407,31 +401,29 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			},
 		}
 	case *packet.PlayerList:
-		var entries []legacypacket.PlayerListEntry
-		for _, entry := range pk.Entries {
-			var patch struct {
-				Geometry struct {
-					Default string
-				}
-			}
-			_ = json.Unmarshal(entry.Skin.SkinResourcePatch, &patch)
-			entries = append(entries, legacypacket.PlayerListEntry{
-				UUID:             entry.UUID,
-				EntityUniqueID:   entry.EntityUniqueID,
-				Username:         entry.Username,
-				SkinID:           entry.Skin.SkinID,
-				SkinData:         entry.Skin.SkinData,
-				CapeData:         entry.Skin.CapeData,
-				SkinGeometryName: patch.Geometry.Default,
-				SkinGeometry:     entry.Skin.SkinGeometry,
-				PlatformChatID:   entry.PlatformChatID,
-				XUID:             entry.XUID,
-			})
-		}
 		return []packet.Packet{
 			&legacypacket.PlayerList{
 				ActionType: pk.ActionType,
-				Entries:    entries,
+				Entries: lo.Map(pk.Entries, func(e protocol.PlayerListEntry, _ int) legacypacket.PlayerListEntry {
+					var patch struct {
+						Geometry struct {
+							Default string
+						}
+					}
+					_ = json.Unmarshal(e.Skin.SkinResourcePatch, &patch)
+					return legacypacket.PlayerListEntry{
+						UUID:             e.UUID,
+						EntityUniqueID:   e.EntityUniqueID,
+						Username:         e.Username,
+						SkinID:           e.Skin.SkinID,
+						SkinData:         e.Skin.SkinData,
+						CapeData:         e.Skin.CapeData,
+						SkinGeometryName: patch.Geometry.Default,
+						SkinGeometry:     e.Skin.SkinGeometry,
+						PlatformChatID:   e.PlatformChatID,
+						XUID:             e.XUID,
+					}
+				}),
 			},
 		}
 	case *packet.UpdateAbilities:
