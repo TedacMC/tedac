@@ -506,7 +506,7 @@ func requestToken() *oauth2.Token {
 	return t
 }
 
-// resourcePack returns a resource pack to use on a respective server. It either reads it from the
+// resourcePacks returns a resource pack to use on a respective server. It either reads it from the
 // packs folder if cached or requests it from the server via dialing.
 func resourcePacks(address string) []*resource.Pack {
 	packID := base64.StdEncoding.EncodeToString([]byte(address))
@@ -532,7 +532,7 @@ func resourcePacks(address string) []*resource.Pack {
 	return packs
 }
 
-// requestPack dials a server in order to obtain its resource pack
+// requestPacks dials a server in order to obtain its resource pack
 func requestPacks(address string) []*resource.Pack {
 	conn, err := minecraft.Dialer{
 		TokenSource: tokenSource(),
