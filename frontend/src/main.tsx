@@ -9,7 +9,7 @@ import Connection from "./Connection";
 import './style.css'
 
 render(
-    <div className={"pt-12 justify-center px-12 text-slate-500 dark:text-slate-400 bg-white dark:bg-gray-900"}>
+    <div className={"flex flex-col justify-center px-12 text-slate-500 dark:text-slate-400 bg-white dark:bg-gray-900"}>
         <BrowserRouter>
             <Routes>
                 <Route path="/" element={<Home/>}/>

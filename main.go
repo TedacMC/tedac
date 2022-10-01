@@ -18,7 +18,7 @@ func main() {
 	err := wails.Run(&options.App{
 		Title:         "Tedac",
 		Width:         905,
-		Height:        500,
+		Height:        515,
 		Frameless:     true,
 		DisableResize: true,
 		Assets:        assets,
