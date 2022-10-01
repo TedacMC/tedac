@@ -372,7 +372,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 			case *packet.SubChunk:
 				if _, ok := conn.Protocol().(tedac.Protocol); !ok {
 					// Only Tedac clients should receive the old format.
-					continue
+					break
 				}
 
 				chunkBuf := bytes.NewBuffer(nil)
@@ -424,30 +424,32 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 				_ = conn.Flush()
 				continue
 			case *packet.LevelChunk:
-				if pk.SubChunkRequestMode != protocol.SubChunkRequestModeLegacy {
-					if _, ok := conn.Protocol().(tedac.Protocol); !ok {
-						// Only Tedac clients should receive the old format.
-						continue
-					}
-
-					max := r.Height() >> 4
-					if pk.SubChunkRequestMode == protocol.SubChunkRequestModeLimited {
-						max = int(pk.HighestSubChunk)
-					}
-
-					offsets := make([]protocol.SubChunkOffset, 0, max)
-					for i := 0; i < max; i++ {
-						offsets = append(offsets, protocol.SubChunkOffset{0, int8(i + (r[0] >> 4)), 0})
-					}
-
-					biomeBufferCache[pk.Position] = pk.RawPayload[:len(pk.RawPayload)-1]
-					_ = serverConn.WritePacket(&packet.SubChunkRequest{
-						Position: protocol.SubChunkPos{pk.Position.X(), 0, pk.Position.Z()},
-						Offsets:  offsets,
-					})
-					_ = serverConn.Flush()
-					continue
+				if pk.SubChunkRequestMode == protocol.SubChunkRequestModeLegacy {
+					// No changes to be made here.
+					break
 				}
+				if _, ok := conn.Protocol().(tedac.Protocol); !ok {
+					// Only Tedac clients should receive the old format.
+					break
+				}
+
+				max := r.Height() >> 4
+				if pk.SubChunkRequestMode == protocol.SubChunkRequestModeLimited {
+					max = int(pk.HighestSubChunk)
+				}
+
+				offsets := make([]protocol.SubChunkOffset, 0, max)
+				for i := 0; i < max; i++ {
+					offsets = append(offsets, protocol.SubChunkOffset{0, int8(i + (r[0] >> 4)), 0})
+				}
+
+				biomeBufferCache[pk.Position] = pk.RawPayload[:len(pk.RawPayload)-1]
+				_ = serverConn.WritePacket(&packet.SubChunkRequest{
+					Position: protocol.SubChunkPos{pk.Position.X(), 0, pk.Position.Z()},
+					Offsets:  offsets,
+				})
+				_ = serverConn.Flush()
+				continue
 			case *packet.Transfer:
 				a.remoteAddress = fmt.Sprintf("%s:%d", pk.Address, pk.Port)
 
