@@ -11,6 +11,8 @@ var assets embed.FS
 
 // The following program implements a proxy that forwards players from one local address to a remote address.
 func main() {
+	// Run the loopback excempt command
+	checkNetIsolation()
 	// Create an instance of the app structure
 	app := NewApp()
 
@@ -28,4 +30,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+// checkNetIsolation checks if a loopback exempt is in place to allow the
+// hosting device to join the server. This is only relevant on Windows.
+func checkNetIsolation() {
+	if runtime.GOOS != "windows" {
+		return
+	}
+	data, _ := exec.Command("CheckNetIsolation", "LoopbackExempt", "-s", `-n="microsoft.minecraftuwp_8wekyb3d8bbwe"`).CombinedOutput()
 }
