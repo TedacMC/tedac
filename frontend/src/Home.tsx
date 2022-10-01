@@ -17,6 +17,23 @@ function Home() {
     const [address, setAddress] = useState("");
     const [port, setPort] = useState("19132");
 
+    const servers: {
+        name: string;
+        address: string;
+        logo: string;
+    }[] = [
+        {
+            name: "Zeqa",
+            address: "zeqa.net",
+            logo: zeqaLogo,
+        },
+        {
+            name: "Vasar",
+            address: "vasar.land",
+            logo: vasarLogo,
+        }
+    ];
+
     return (
         <div>
             <div className={"flex flex-row"}>
@@ -38,7 +55,7 @@ function Home() {
                                onFocus={() => {
                                    if (!connectionButton) {
                                        // We're connecting, so don't allow the user to change the address.
-                                        return
+                                       return
                                    }
                                    setShowServers(true)
                                }}
@@ -61,30 +78,20 @@ function Home() {
                             <div
                                 tabIndex={0}
                                 className="grid grid-cols-1 grid-rows-2 grid-flow-col gap-x-2 mt-2 bg-slate-700 shadow-lg rounded-lg absolute">
-                                <button
-                                    className="pl-2.5 py-2.5 pr-32 flex flew-row items-center bg-transparent rounded-lg hover:bg-slate-800"
-                                    onClick={() => {
-                                        setAddress("zeqa.net");
-                                        setShowServers(false);
-                                    }}>
-                                    <img className="rounded-lg max-h-16 max-w-16" src={zeqaLogo}/>
-                                    <div className="ml-3 text-left">
-                                        <p className="font-extrabold text-md">Zeqa</p>
-                                        <p className="text-sm">zeqa.net</p>
-                                    </div>
-                                </button>
-                                <button
-                                    className="pl-2.5 py-2.5 pr-32 flex flex-row items-center rounded-lg bg-transparent hover:bg-slate-800"
-                                    onClick={() => {
-                                        setAddress("vasar.land");
-                                        setShowServers(false);
-                                    }}>
-                                    <img className="rounded-lg max-h-16" src={vasarLogo}/>
-                                    <div className="ml-3 text-left">
-                                        <p className="font-extrabold text-md">Vasar</p>
-                                        <p className="text-sm">vasar.land</p>
-                                    </div>
-                                </button>
+                                {servers.map((server) => (
+                                    <button
+                                        className="pl-2.5 py-2.5 pr-32 flex flew-row items-center bg-transparent rounded-lg hover:bg-slate-800"
+                                        onClick={() => {
+                                            setAddress(server.address);
+                                            setShowServers(false);
+                                        }}>
+                                        <img className="rounded-lg max-h-16 max-w-16" src={server.logo}/>
+                                        <div className="ml-3 text-left">
+                                            <p className="font-extrabold text-md">{server.name}</p>
+                                            <p className="text-sm">{server.address}</p>
+                                        </div>
+                                    </button>
+                                ))}
                             </div>
                             : null}
                     </div>
