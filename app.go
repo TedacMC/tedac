@@ -214,6 +214,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 			t := time.NewTicker(time.Second / 20)
 			defer t.Stop()
 
+			var tick uint64
 			for range t.C {
 				currentPos, originalPos := pos.Load(), lastPos.Load()
 				lastPos.Store(currentPos)
@@ -250,18 +251,22 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 				}
 
 				err := serverConn.WritePacket(&packet.PlayerAuthInput{
-					Position:  currentPos,
-					Delta:     currentPos.Sub(originalPos),
-					Pitch:     currentPitch,
-					Yaw:       currentYaw,
-					HeadYaw:   currentYaw,
-					InputData: inputs,
-					InputMode: packet.InputModeMouse,
+					Delta:            currentPos.Sub(originalPos),
+					HeadYaw:          currentYaw,
+					InputData:        inputs,
+					InputMode:        packet.InputModeMouse,
+					InteractionModel: packet.InteractionModelCrosshair,
+					Pitch:            currentPitch,
+					PlayMode:         packet.PlayModeNormal,
+					Position:         currentPos,
+					Tick:             tick,
+					Yaw:              currentYaw,
 				})
 				if err != nil {
 					return
 				}
 				_ = serverConn.Flush()
+				tick++
 			}
 		}()
 	}
