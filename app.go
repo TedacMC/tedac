@@ -177,6 +177,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 			clientData.SkinImageWidth = 128
 		}
 	}
+
 	serverConn, err := minecraft.Dialer{
 		TokenSource: a.src,
 		ClientData:  clientData,
