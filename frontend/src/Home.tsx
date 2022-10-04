@@ -156,7 +156,7 @@ function Home() {
                 </div>
             </div>
             {!checkNetIsolation ?
-                <LoopbackWarning path={`/error?address=${address}&port=${port}`} navigate={navigate}></LoopbackWarning> : <></>}
+                <LoopbackWarning path={`/?address=${address}&port=${port}`} navigate={navigate}></LoopbackWarning> : <></>}
         </div>
 
     )
