@@ -10,13 +10,14 @@ import {LoopbackWarning} from "./Loopback";
 
 function Home() {
     const navigate = useNavigate()
+    const params = new URLSearchParams(window.location.search);
 
     const [showServers, setShowServers] = useState(false)
     const [connectionButton, setConnectionButton] = useState(true);
     const [connectionLoader, setConnectionLoader] = useState("none");
 
-    const [address, setAddress] = useState("");
-    const [port, setPort] = useState("19132");
+    const [address, setAddress] = useState(params.get("address") || "");
+    const [port, setPort] = useState(params.get("port") || "19132");
 
     const [checkNetIsolation, setCheckNetIsolation] = useState(true)
     useEffect(() => {
@@ -132,7 +133,7 @@ function Home() {
                                 Connect(address + ":" + port).then(() => {
                                     navigate("/connection");
                                 }).catch((e) => {
-                                    navigate("/error?error=" + e);
+                                    navigate(`/error?error=${e}&address=${address}&port=${port}`);
                                 });
                             }} disabled={!connectionButton}
                             className="inline-flex items-center text-white bg-slate-900 hover:bg-slate-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full sm:w-auto px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
@@ -155,7 +156,7 @@ function Home() {
                 </div>
             </div>
             {!checkNetIsolation ?
-                <LoopbackWarning path={"/"} navigate={navigate}></LoopbackWarning> : <></>}
+                <LoopbackWarning path={`/error?address=${address}&port=${port}`} navigate={navigate}></LoopbackWarning> : <></>}
         </div>
 
     )
