@@ -7,13 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
-	"os"
-	"os/exec"
-	"runtime"
-	"strings"
-	"sync"
-	"time"
 
 	"github.com/df-mc/atomic"
 	"github.com/df-mc/dragonfly/server/world"
@@ -28,6 +21,13 @@ import (
 	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
 	"github.com/wailsapp/wails/lib/renderer/webview"
 	"golang.org/x/oauth2"
+	"net"
+	"os"
+	"os/exec"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
 )
 
 // App ...
