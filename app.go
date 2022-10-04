@@ -162,6 +162,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 	if _, ok := conn.Protocol().(tedac.Protocol); ok { // TODO: Adjust this inside Protocol itself.
 		clientData.GameVersion = protocol.CurrentVersion
 		clientData.SkinResourcePatch = defaultSkinResourcePatch
+		clientData.DeviceModel = strings.ToUpper(clientData.DeviceModel)
 
 		data, _ := base64.StdEncoding.DecodeString(clientData.SkinData)
 		switch len(data) {
@@ -176,7 +177,6 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 			clientData.SkinImageWidth = 128
 		}
 	}
-	clientData.DeviceModel = strings.ToUpper(clientData.DeviceModel)
 	serverConn, err := minecraft.Dialer{
 		TokenSource: a.src,
 		ClientData:  clientData,
