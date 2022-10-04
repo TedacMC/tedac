@@ -7,6 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"os"
+	"os/exec"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/df-mc/atomic"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -20,12 +28,6 @@ import (
 	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
 	"github.com/wailsapp/wails/lib/renderer/webview"
 	"golang.org/x/oauth2"
-	"net"
-	"os"
-	"os/exec"
-	"runtime"
-	"sync"
-	"time"
 )
 
 // App ...
@@ -175,7 +177,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 			clientData.SkinImageWidth = 128
 		}
 	}
-
+	clientData.DeviceModel = strings.ToUpper(clientData.DeviceModel)
 	serverConn, err := minecraft.Dialer{
 		TokenSource: a.src,
 		ClientData:  clientData,
