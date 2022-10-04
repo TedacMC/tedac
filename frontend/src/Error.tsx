@@ -1,9 +1,17 @@
 import {useNavigate} from "react-router-dom";
 import {BrowserOpenURL} from "../wailsjs/runtime";
+import {useEffect, useState} from "react";
+import {CheckNetIsolation} from "../wailsjs/go/main/App";
+import {LoopbackWarning} from "./Loopback";
 
 function Error() {
     const navigate = useNavigate()
     const params = new URLSearchParams(window.location.search);
+
+    const [checkNetIsolation, setCheckNetIsolation] = useState(true)
+    useEffect(() => {
+        CheckNetIsolation().then(result => setCheckNetIsolation(result))
+    }, [])
 
     const error = params.get("error") || "";
     const knownSolutions: {[index: string]: string } = {
@@ -54,6 +62,8 @@ function Error() {
                     </button>
                 </div>
             </div>
+            {!checkNetIsolation ?
+                <LoopbackWarning path={`/?address=${params.get("address") || ""}&port=${params.get("port") || "19132"}`} navigate={navigate}></LoopbackWarning> : <></>}
         </div>
     )
 }
