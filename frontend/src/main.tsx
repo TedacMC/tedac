@@ -8,6 +8,7 @@ import Connection from "./Connection";
 
 import './style.css'
 import Loopback from "./Loopback";
+import Error from "./Error";
 
 render(
     <div className={"flex flex-col justify-center px-12 text-slate-500 dark:text-slate-400 bg-white dark:bg-gray-900"}>
@@ -15,6 +16,7 @@ render(
             <Routes>
                 <Route path="/" element={<Home/>}/>
                 <Route path="/connection" element={<Connection/>}/>
+                <Route path="/error" element={<Error/>}/>
                 <Route path="/loopback" element={<Loopback/>}/>
             </Routes>
         </BrowserRouter>
