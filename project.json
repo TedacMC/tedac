@@ -1,0 +1,25 @@
+{
+  "name": "Tedac",
+  "description": "The v1.12.0 Multi-Version Proxy",
+  "author": {
+    "name": "JustTal",
+    "email": "justtal@protonmail.com"
+  },
+  "version": "1.0.7",
+  "binaryname": "tedac",
+  "frontend": {
+    "dir": "frontend",
+    "install": "npm install",
+    "build": "npm run build",
+    "bridge": "src",
+    "serve": "npm run serve"
+  },
+  "tags": "",
+  "WailsVersion": "",
+  "CrossCompile": false,
+  "Platform": "",
+  "Architecture": "",
+  "LdFlags": "",
+  "GoPath": "",
+  "UseFirebug": false
+}
