@@ -3,11 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/df-mc/atomic"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
@@ -17,7 +15,6 @@ import (
 	"github.com/tedacmc/tedac/tedac"
 	"github.com/tedacmc/tedac/tedac/chunk"
 	"github.com/tedacmc/tedac/tedac/latestmappings"
-	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
 	"github.com/wailsapp/wails/lib/renderer/webview"
 	"golang.org/x/oauth2"
 	"net"
@@ -25,7 +22,6 @@ import (
 	"os/exec"
 	"runtime"
 	"sync"
-	"time"
 )
 
 // App ...
@@ -145,14 +141,6 @@ func (a *App) startup(ctx context.Context) {
 var (
 	// airRID is the runtime ID of the air block in the latest version of the game.
 	airRID, _ = latestmappings.StateToRuntimeID("minecraft:air", nil)
-	// defaultSkinResourcePatch holds the skin resource patch assigned to a player when they wear a custom skin.
-	defaultSkinResourcePatch = base64.StdEncoding.EncodeToString([]byte(`
-		{
-		   "geometry" : {
-		      "default" : "geometry.humanoid.custom"
-		   }
-		}
-	`))
 )
 
 // handleConn handles a new incoming minecraft.Conn from the minecraft.Listener passed.
@@ -160,20 +148,6 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 	clientData := conn.ClientData()
 	if _, ok := conn.Protocol().(tedac.Protocol); ok { // TODO: Adjust this inside Protocol itself.
 		clientData.GameVersion = protocol.CurrentVersion
-		clientData.SkinResourcePatch = defaultSkinResourcePatch
-
-		data, _ := base64.StdEncoding.DecodeString(clientData.SkinData)
-		switch len(data) {
-		case 32 * 64 * 4:
-			clientData.SkinImageHeight = 32
-			clientData.SkinImageWidth = 64
-		case 64 * 64 * 4:
-			clientData.SkinImageHeight = 64
-			clientData.SkinImageWidth = 64
-		case 128 * 128 * 4:
-			clientData.SkinImageHeight = 128
-			clientData.SkinImageWidth = 128
-		}
 	}
 
 	serverConn, err := minecraft.Dialer{
@@ -189,100 +163,26 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 	var g sync.WaitGroup
 	g.Add(2)
 	go func() {
+		fmt.Println("Starting game")
 		if err := conn.StartGame(data); err != nil {
 			panic(err)
 		}
+		fmt.Println("Started game")
 		g.Done()
 	}()
 	go func() {
+		fmt.Println("Spawning")
 		if err := serverConn.DoSpawn(); err != nil {
 			panic(err)
 		}
+		fmt.Println("Spawned")
 		g.Done()
 	}()
 	g.Wait()
 
-	// TODO: Component-ize the shit below.
-	rid := data.EntityRuntimeID
-	oldMovementSystem := data.PlayerMovementSettings.MovementType == protocol.PlayerMovementModeClient
-	if _, ok := conn.Protocol().(tedac.Protocol); ok {
-		oldMovementSystem = true
-	}
-
 	r := world.Overworld.Range()
-	pos := atomic.NewValue(data.PlayerPosition)
-	lastPos := atomic.NewValue(data.PlayerPosition)
-	yaw, pitch := atomic.NewValue(data.Yaw), atomic.NewValue(data.Pitch)
-
-	startedSneaking, stoppedSneaking := atomic.NewValue(false), atomic.NewValue(false)
-	startedSprinting, stoppedSprinting := atomic.NewValue(false), atomic.NewValue(false)
-	startedGliding, stoppedGliding := atomic.NewValue(false), atomic.NewValue(false)
-	startedSwimming, stoppedSwimming := atomic.NewValue(false), atomic.NewValue(false)
-	startedJumping := atomic.NewValue(false)
-
 	biomeBufferCache := make(map[protocol.ChunkPos][]byte)
 
-	if oldMovementSystem {
-		go func() {
-			t := time.NewTicker(time.Second / 20)
-			defer t.Stop()
-
-			var tick uint64
-			for range t.C {
-				currentPos, originalPos := pos.Load(), lastPos.Load()
-				lastPos.Store(currentPos)
-
-				currentYaw, currentPitch := yaw.Load(), pitch.Load()
-
-				inputs := uint64(0)
-				if startedSneaking.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStartSneaking
-				}
-				if stoppedSneaking.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStopSneaking
-				}
-				if startedSprinting.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStartSprinting
-				}
-				if stoppedSprinting.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStopSprinting
-				}
-				if startedGliding.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStartGliding
-				}
-				if stoppedGliding.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStopGliding
-				}
-				if startedSwimming.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStartSwimming
-				}
-				if stoppedSwimming.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStopSwimming
-				}
-				if startedJumping.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagJumping
-				}
-
-				err := serverConn.WritePacket(&packet.PlayerAuthInput{
-					Delta:            currentPos.Sub(originalPos),
-					HeadYaw:          currentYaw,
-					InputData:        inputs,
-					InputMode:        packet.InputModeMouse,
-					InteractionModel: packet.InteractionModelCrosshair,
-					Pitch:            currentPitch,
-					PlayMode:         packet.PlayModeNormal,
-					Position:         currentPos,
-					Tick:             tick,
-					Yaw:              currentYaw,
-				})
-				if err != nil {
-					return
-				}
-				_ = serverConn.Flush()
-				tick++
-			}
-		}()
-	}
 	go func() {
 		defer a.listener.Disconnect(conn, "connection lost")
 		defer serverConn.Close()
@@ -290,49 +190,6 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 			pk, err := conn.ReadPacket()
 			if err != nil {
 				return
-			}
-			switch pk := pk.(type) {
-			case *packet.MovePlayer:
-				if !oldMovementSystem {
-					break
-				}
-				pos.Store(pk.Position)
-				yaw.Store(pk.Yaw)
-				pitch.Store(pk.Pitch)
-				continue
-			case *packet.PlayerAction:
-				if !oldMovementSystem {
-					break
-				}
-				switch pk.ActionType {
-				case legacypacket.PlayerActionJump:
-					startedJumping.Store(true)
-					continue
-				case legacypacket.PlayerActionStartSprint:
-					startedSprinting.Store(true)
-					continue
-				case legacypacket.PlayerActionStopSprint:
-					stoppedSprinting.Store(true)
-					continue
-				case legacypacket.PlayerActionStartSneak:
-					startedSneaking.Store(true)
-					continue
-				case legacypacket.PlayerActionStopSneak:
-					stoppedSneaking.Store(true)
-					continue
-				case legacypacket.PlayerActionStartSwimming:
-					startedSwimming.Store(true)
-					continue
-				case legacypacket.PlayerActionStopSwimming:
-					stoppedSwimming.Store(true)
-					continue
-				case legacypacket.PlayerActionStartGlide:
-					startedGliding.Store(true)
-					continue
-				case legacypacket.PlayerActionStopGlide:
-					stoppedGliding.Store(true)
-					continue
-				}
 			}
 			if err := serverConn.WritePacket(pk); err != nil {
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
@@ -355,33 +212,6 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 				return
 			}
 			switch pk := pk.(type) {
-			case *packet.MovePlayer:
-				if !oldMovementSystem {
-					break
-				}
-				if pk.EntityRuntimeID == rid {
-					pos.Store(pk.Position)
-					yaw.Store(pk.Yaw)
-					pitch.Store(pk.Pitch)
-				}
-			case *packet.MoveActorAbsolute:
-				if !oldMovementSystem {
-					break
-				}
-				if pk.EntityRuntimeID == rid {
-					pos.Store(pk.Position)
-					yaw.Store(pk.Rotation[2])
-					pitch.Store(pk.Rotation[0])
-				}
-			case *packet.MoveActorDelta:
-				if !oldMovementSystem {
-					break
-				}
-				if pk.EntityRuntimeID == rid {
-					pos.Store(pk.Position)
-					yaw.Store(pk.Rotation[2])
-					pitch.Store(pk.Rotation[0])
-				}
 			case *packet.SubChunk:
 				if _, ok := conn.Protocol().(tedac.Protocol); !ok {
 					// Only Tedac clients should receive the old format.

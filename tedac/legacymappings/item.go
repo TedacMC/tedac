@@ -3,6 +3,7 @@ package legacymappings
 import (
 	_ "embed"
 	"encoding/json"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
 var (
@@ -10,7 +11,7 @@ var (
 	itemIDData []byte
 
 	// items holds a list of all existing items in the game.
-	items []ItemEntry
+	items []protocol.ItemEntry
 	// itemIDsToNames holds a map to translate item runtime IDs to string IDs.
 	itemIDsToNames = map[int16]string{}
 	// itemNamesToIDs holds a map to translate item string IDs to runtime IDs.
@@ -24,7 +25,7 @@ func init() {
 		panic(err)
 	}
 	for name, id := range m {
-		items = append(items, ItemEntry{Name: name, LegacyID: id})
+		items = append(items, protocol.ItemEntry{Name: name, RuntimeID: id})
 		itemNamesToIDs[name] = id
 		itemIDsToNames[id] = name
 	}
@@ -57,6 +58,6 @@ func ItemIDByName(name string) (int16, bool) {
 }
 
 // Items returns a slice of all item entries.
-func Items() []ItemEntry {
+func Items() []protocol.ItemEntry {
 	return items
 }

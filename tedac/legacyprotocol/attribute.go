@@ -20,11 +20,59 @@ type Attribute struct {
 	Default float32
 }
 
-// Marshal encodes/decodes an Attribute.
-func (x *Attribute) Marshal(r protocol.IO) {
-	r.Float32(&x.Min)
-	r.Float32(&x.Max)
-	r.Float32(&x.Value)
-	r.Float32(&x.Default)
-	r.String(&x.Name)
+// Attributes reads an Attribute slice x from Reader r.
+func Attributes(r *protocol.Reader, x *[]Attribute) {
+	var count uint32
+	r.Varuint32(&count)
+	r.LimitUint32(count, mediumLimit)
+
+	*x = make([]Attribute, count)
+	for i := uint32(0); i < count; i++ {
+		r.Float32(&(*x)[i].Min)
+		r.Float32(&(*x)[i].Max)
+		r.Float32(&(*x)[i].Value)
+		r.Float32(&(*x)[i].Default)
+		r.String(&(*x)[i].Name)
+	}
+}
+
+// WriteAttributes writes a slice of Attributes x to Writer w.
+func WriteAttributes(w *protocol.Writer, x *[]Attribute) {
+	l := uint32(len(*x))
+	w.Varuint32(&l)
+	for _, attribute := range *x {
+		w.Float32(&attribute.Min)
+		w.Float32(&attribute.Max)
+		w.Float32(&attribute.Value)
+		w.Float32(&attribute.Default)
+		w.String(&attribute.Name)
+	}
+}
+
+// InitialAttributes reads an Attribute slice from bytes.Buffer src and stores it in the pointer passed.
+// InitialAttributes is used when reading the attributes of a new entity. (AddEntity packet)
+func InitialAttributes(r *protocol.Reader, x *[]Attribute) {
+	var count uint32
+	r.Varuint32(&count)
+	r.LimitUint32(count, mediumLimit)
+	*x = make([]Attribute, count)
+	for i := uint32(0); i < count; i++ {
+		r.String(&(*x)[i].Name)
+		r.Float32(&(*x)[i].Min)
+		r.Float32(&(*x)[i].Value)
+		r.Float32(&(*x)[i].Max)
+	}
+}
+
+// WriteInitialAttributes writes a slice of Attributes x to Writer w. WriteInitialAttributes is used when
+// writing the attributes of a new entity. (AddEntity packet)
+func WriteInitialAttributes(w *protocol.Writer, x *[]Attribute) {
+	l := uint32(len(*x))
+	w.Varuint32(&l)
+	for _, attribute := range *x {
+		w.String(&attribute.Name)
+		w.Float32(&attribute.Min)
+		w.Float32(&attribute.Value)
+		w.Float32(&attribute.Max)
+	}
 }

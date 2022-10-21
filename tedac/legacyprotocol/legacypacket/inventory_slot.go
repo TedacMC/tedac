@@ -18,7 +18,7 @@ type InventorySlot struct {
 	Slot uint32
 	// NewItem is the item to be put in the slot at Slot. It will overwrite any item that may currently
 	// be present in that slot.
-	NewItem legacyprotocol.ItemStack
+	NewItem legacyprotocol.ItemInstance
 }
 
 // ID ...
@@ -30,12 +30,12 @@ func (*InventorySlot) ID() uint32 {
 func (pk *InventorySlot) Marshal(w *protocol.Writer) {
 	w.Varuint32(&pk.WindowID)
 	w.Varuint32(&pk.Slot)
-	legacyprotocol.WriteItem(w, &pk.NewItem)
+	legacyprotocol.WriteItemInst(w, &pk.NewItem)
 }
 
 // Unmarshal ...
 func (pk *InventorySlot) Unmarshal(r *protocol.Reader) {
 	r.Varuint32(&pk.WindowID)
 	r.Varuint32(&pk.Slot)
-	legacyprotocol.Item(r, &pk.NewItem)
+	legacyprotocol.ItemInst(r, &pk.NewItem)
 }

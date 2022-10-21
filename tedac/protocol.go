@@ -2,9 +2,7 @@ package tedac
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
-
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/samber/lo"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -17,30 +15,36 @@ import (
 	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
 	_ "github.com/tedacmc/tedac/tedac/raknet"
+	"image/color"
 )
 
-// Protocol represents the v1.12.0 Protocol implementation.
+// Protocol represents the v1.16.100 Protocol implementation.
 type Protocol struct{}
 
 // ID ...
 func (Protocol) ID() int32 {
-	return 361
+	return 419
 }
 
 // Ver ...
 func (Protocol) Ver() string {
-	return "1.12.1"
+	return "1.16.100"
 }
 
 // Packets ...
 func (Protocol) Packets() packet.Pool {
 	pool := packet.NewPool()
-	pool[packet.IDContainerClose] = func() packet.Packet { return &legacypacket.ContainerClose{} }
-	pool[packet.IDInventoryTransaction] = func() packet.Packet { return &legacypacket.InventoryTransaction{} }
+	pool[packet.IDActorPickRequest] = func() packet.Packet { return &legacypacket.ActorPickRequest{} }
+	pool[packet.IDCraftingEvent] = func() packet.Packet { return &legacypacket.CraftingEvent{} }
+	pool[packet.IDMapInfoRequest] = func() packet.Packet { return &legacypacket.MapInfoRequest{} }
+	pool[packet.IDMobArmourEquipment] = func() packet.Packet { return &legacypacket.MobArmourEquipment{} }
 	pool[packet.IDMobEquipment] = func() packet.Packet { return &legacypacket.MobEquipment{} }
 	pool[packet.IDModalFormResponse] = func() packet.Packet { return &legacypacket.ModalFormResponse{} }
-	pool[packet.IDMovePlayer] = func() packet.Packet { return &legacypacket.MovePlayer{} }
 	pool[packet.IDPlayerAction] = func() packet.Packet { return &legacypacket.PlayerAction{} }
+	pool[packet.IDPlayerAuthInput] = func() packet.Packet { return &legacypacket.PlayerAuthInput{} }
+	pool[packet.IDPlayerSkin] = func() packet.Packet { return &legacypacket.PlayerSkin{} }
+
+	pool[packet.IDInventoryTransaction] = func() packet.Packet { return &legacypacket.InventoryTransaction{} }
 	return pool
 }
 
@@ -54,20 +58,70 @@ var nullBytes = []byte("null\n")
 
 // ConvertToLatest ...
 func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
-	//fmt.Printf("1.12 -> 1.19.30: %T\n", pk)
+	fmt.Printf("1.16.100 -> 1.19.30: %T\n", pk)
 	switch pk := pk.(type) {
-	case *legacypacket.MovePlayer:
+	case *legacypacket.ActorPickRequest:
 		return []packet.Packet{
-			&packet.MovePlayer{
-				EntityRuntimeID:       pk.EntityRuntimeID,
-				Position:              pk.Position,
-				Pitch:                 pk.Pitch,
-				Yaw:                   pk.Yaw,
-				HeadYaw:               pk.HeadYaw,
-				Mode:                  pk.Mode,
-				OnGround:              pk.OnGround,
-				RiddenEntityRuntimeID: pk.RiddenEntityRuntimeID,
-				TeleportCause:         pk.TeleportCause,
+			&packet.ActorPickRequest{
+				EntityUniqueID: pk.EntityUniqueID,
+				HotBarSlot:     pk.HotBarSlot,
+			},
+		}
+	case *legacypacket.CraftingEvent:
+		return []packet.Packet{
+			&packet.CraftingEvent{
+				WindowID:     pk.WindowID,
+				CraftingType: pk.CraftingType,
+				RecipeUUID:   pk.RecipeUUID,
+				Input: lo.Map(pk.Input, func(stack legacyprotocol.ItemStack, _ int) protocol.ItemInstance {
+					return protocol.ItemInstance{Stack: upgradeItem(stack)}
+				}),
+				Output: lo.Map(pk.Output, func(stack legacyprotocol.ItemStack, _ int) protocol.ItemInstance {
+					return protocol.ItemInstance{Stack: upgradeItem(stack)}
+				}),
+			},
+		}
+	case *legacypacket.MapInfoRequest:
+		return []packet.Packet{
+			&packet.MapInfoRequest{
+				MapID: pk.MapID,
+			},
+		}
+	case *legacypacket.MobArmourEquipment:
+		return []packet.Packet{
+			&packet.MobArmourEquipment{
+				EntityRuntimeID: pk.EntityRuntimeID,
+				Helmet:          protocol.ItemInstance{Stack: upgradeItem(pk.Helmet)},
+				Chestplate:      protocol.ItemInstance{Stack: upgradeItem(pk.Chestplate)},
+				Leggings:        protocol.ItemInstance{Stack: upgradeItem(pk.Leggings)},
+				Boots:           protocol.ItemInstance{Stack: upgradeItem(pk.Boots)},
+			},
+		}
+	case *legacypacket.MobEquipment:
+		return []packet.Packet{
+			&packet.MobEquipment{
+				EntityRuntimeID: pk.EntityRuntimeID,
+				NewItem:         protocol.ItemInstance{Stack: upgradeItem(pk.NewItem)},
+				InventorySlot:   pk.InventorySlot,
+				HotBarSlot:      pk.HotBarSlot,
+				WindowID:        pk.WindowID,
+			},
+		}
+	case *legacypacket.ModalFormResponse:
+		var response protocol.Optional[[]byte]
+		var cancelReason protocol.Optional[uint8]
+		if !bytes.Equal(pk.ResponseData, nullBytes) {
+			// The response data is not null, so it is a valid response.
+			response = protocol.Option(pk.ResponseData)
+		} else {
+			// We can always default to the user closed reason if the response data doesn't exist.
+			cancelReason = protocol.Option[uint8](packet.ModalFormCancelReasonUserClosed)
+		}
+		return []packet.Packet{
+			&packet.ModalFormResponse{
+				FormID:       pk.FormID,
+				ResponseData: response,
+				CancelReason: cancelReason,
 			},
 		}
 	case *legacypacket.PlayerAction:
@@ -77,6 +131,32 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				ActionType:      pk.ActionType,
 				BlockPosition:   pk.BlockPosition,
 				BlockFace:       pk.BlockFace,
+			},
+		}
+	case *legacypacket.PlayerAuthInput:
+		return []packet.Packet{
+			&packet.PlayerAuthInput{
+				Pitch:            pk.Pitch,
+				Yaw:              pk.Yaw,
+				Position:         pk.Position,
+				MoveVector:       pk.MoveVector,
+				HeadYaw:          pk.HeadYaw,
+				InputData:        pk.InputData,
+				InputMode:        pk.InputMode,
+				PlayMode:         pk.PlayMode,
+				InteractionModel: packet.InteractionModelCrosshair,
+				GazeDirection:    pk.GazeDirection,
+				Tick:             pk.Tick,
+				Delta:            pk.Delta,
+			},
+		}
+	case *legacypacket.PlayerSkin:
+		return []packet.Packet{
+			&packet.PlayerSkin{
+				UUID:        pk.UUID,
+				Skin:        legacyprotocol.LatestSkin(pk.Skin),
+				NewSkinName: pk.NewSkinName,
+				OldSkinName: pk.OldSkinName,
 			},
 		}
 	case *legacypacket.InventoryTransaction:
@@ -133,46 +213,13 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				TransactionData: transactionData,
 			},
 		}
-	case *legacypacket.ModalFormResponse:
-		var response protocol.Optional[[]byte]
-		var cancelReason protocol.Optional[uint8]
-		if !bytes.Equal(pk.ResponseData, nullBytes) {
-			// The response data is not null, so it is a valid response.
-			response = protocol.Option(pk.ResponseData)
-		} else {
-			// We can always default to the user closed reason if the response data doesn't exist.
-			cancelReason = protocol.Option[uint8](packet.ModalFormCancelReasonUserClosed)
-		}
-		return []packet.Packet{
-			&packet.ModalFormResponse{
-				FormID:       pk.FormID,
-				ResponseData: response,
-				CancelReason: cancelReason,
-			},
-		}
-	case *legacypacket.MobEquipment:
-		return []packet.Packet{
-			&packet.MobEquipment{
-				EntityRuntimeID: pk.EntityRuntimeID,
-				NewItem:         protocol.ItemInstance{Stack: upgradeItem(pk.NewItem)},
-				InventorySlot:   pk.InventorySlot,
-				HotBarSlot:      pk.HotBarSlot,
-				WindowID:        pk.WindowID,
-			},
-		}
-	case *legacypacket.ContainerClose:
-		return []packet.Packet{
-			&packet.ContainerClose{
-				WindowID:   pk.WindowID,
-				ServerSide: false,
-			},
-		}
 	case *packet.AdventureSettings:
-		// TODO: Send request ability instead?
+	case *packet.TickSync:
 		return nil
+	case *packet.PacketViolationWarning:
+		fmt.Println(pk)
 	}
-
-	if pk.ID() == 37 { // TODO: This is so fucking ugly why just why
+	if pk.ID() == 37 {
 		return nil
 	}
 	return []packet.Packet{pk}
@@ -180,59 +227,193 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 
 // ConvertFromLatest ...
 func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []packet.Packet {
-	//fmt.Printf("1.19.30 -> 1.12: %T\n", pk)
+	fmt.Printf("1.19.30 -> 1.16.100: %T\n", pk)
 	switch pk := pk.(type) {
-	case *packet.StartGame:
-		// TODO: Adjust our mappings to account for any possible custom blocks.
+	case *packet.AddActor:
 		return []packet.Packet{
-			&legacypacket.StartGame{
-				EntityUniqueID:                 pk.EntityUniqueID,
-				EntityRuntimeID:                pk.EntityRuntimeID,
-				PlayerGameMode:                 pk.PlayerGameMode,
-				PlayerPosition:                 pk.PlayerPosition,
-				Pitch:                          pk.Pitch,
-				Yaw:                            pk.Yaw,
-				WorldSeed:                      int32(pk.WorldSeed),
-				Dimension:                      pk.Dimension,
-				Generator:                      pk.Generator,
-				WorldGameMode:                  pk.WorldGameMode,
-				Difficulty:                     pk.Difficulty,
-				WorldSpawn:                     pk.WorldSpawn,
-				AchievementsDisabled:           pk.AchievementsDisabled,
-				DayCycleLockTime:               pk.DayCycleLockTime,
-				EducationFeaturesEnabled:       pk.EducationFeaturesEnabled,
-				RainLevel:                      pk.RainLevel,
-				LightningLevel:                 pk.LightningLevel,
-				ConfirmedPlatformLockedContent: pk.ConfirmedPlatformLockedContent,
-				MultiPlayerGame:                pk.MultiPlayerGame,
-				LANBroadcastEnabled:            pk.LANBroadcastEnabled,
-				XBLBroadcastMode:               pk.XBLBroadcastMode,
-				PlatformBroadcastMode:          pk.PlatformBroadcastMode,
-				CommandsEnabled:                pk.CommandsEnabled,
-				TexturePackRequired:            pk.TexturePackRequired,
-				BonusChestEnabled:              pk.BonusChestEnabled,
-				StartWithMapEnabled:            pk.StartWithMapEnabled,
-				PlayerPermissions:              pk.PlayerPermissions,
-				ServerChunkTickRadius:          pk.ServerChunkTickRadius,
-				HasLockedBehaviourPack:         pk.HasLockedBehaviourPack,
-				HasLockedTexturePack:           pk.HasLockedTexturePack,
-				FromLockedWorldTemplate:        pk.FromLockedWorldTemplate,
-				MSAGamerTagsOnly:               pk.MSAGamerTagsOnly,
-				FromWorldTemplate:              pk.FromWorldTemplate,
-				WorldTemplateSettingsLocked:    pk.WorldTemplateSettingsLocked,
-				OnlySpawnV1Villagers:           pk.OnlySpawnV1Villagers,
-				LevelID:                        pk.LevelID,
-				WorldName:                      pk.WorldName,
-				PremiumWorldTemplateID:         pk.TemplateContentIdentity,
-				Trial:                          pk.Trial,
-				Time:                           pk.Time,
-				EnchantmentSeed:                pk.EnchantmentSeed,
-				MultiPlayerCorrelationID:       pk.MultiPlayerCorrelationID,
-				Blocks:                         legacymappings.Blocks(),
-				Items:                          legacymappings.Items(),
+			&legacypacket.AddActor{
+				EntityUniqueID:  pk.EntityUniqueID,
+				EntityRuntimeID: pk.EntityRuntimeID,
+				EntityType:      pk.EntityType,
+				Position:        pk.Position,
+				Velocity:        pk.Velocity,
+				Pitch:           pk.Pitch,
+				Yaw:             pk.Yaw,
+				HeadYaw:         pk.HeadYaw,
+				Attributes: lo.Map(pk.Attributes, func(a protocol.AttributeValue, _ int) legacyprotocol.Attribute {
+					return legacyprotocol.Attribute{
+						Name:  a.Name,
+						Value: a.Value,
+						Max:   a.Max,
+						Min:   a.Min,
+					}
+				}),
+				EntityMetadata: pk.EntityMetadata,
+				EntityLinks:    pk.EntityLinks,
+			},
+		}
+	case *packet.AddItemActor:
+		return []packet.Packet{
+			&legacypacket.AddItemActor{
+				EntityUniqueID:  pk.EntityUniqueID,
+				EntityRuntimeID: pk.EntityRuntimeID,
+				Item:            downgradeItem(pk.Item.Stack),
+				Position:        pk.Position,
+				Velocity:        pk.Velocity,
+				EntityMetadata:  pk.EntityMetadata,
+				FromFishing:     pk.FromFishing,
+			},
+		}
+	case *packet.AddPlayer:
+		return []packet.Packet{
+			&legacypacket.AddPlayer{
+				UUID:                   pk.UUID,
+				Username:               pk.Username,
+				EntityUniqueID:         pk.AbilityData.EntityUniqueID,
+				EntityRuntimeID:        pk.EntityRuntimeID,
+				PlatformChatID:         pk.PlatformChatID,
+				Position:               pk.Position,
+				Velocity:               pk.Velocity,
+				Pitch:                  pk.Pitch,
+				Yaw:                    pk.Yaw,
+				HeadYaw:                pk.HeadYaw,
+				HeldItem:               downgradeItem(pk.HeldItem.Stack),
+				EntityMetadata:         pk.EntityMetadata,
+				CommandPermissionLevel: uint32(pk.AbilityData.CommandPermissions),
+				PermissionLevel:        uint32(pk.AbilityData.PlayerPermissions),
+				PlayerUniqueID:         pk.AbilityData.EntityUniqueID,
+				EntityLinks:            pk.EntityLinks,
+				DeviceID:               pk.DeviceID,
+				BuildPlatform:          pk.BuildPlatform,
+			},
+		}
+	case *packet.AvailableCommands:
+		return []packet.Packet{
+			&legacypacket.AvailableCommands{
+				Commands: lo.Map(pk.Commands, func(c protocol.Command, _ int) legacyprotocol.Command {
+					return legacyprotocol.Command{
+						Name:            c.Name,
+						Description:     c.Description,
+						Flags:           byte(c.Flags),
+						PermissionLevel: c.PermissionLevel,
+						Aliases:         c.Aliases,
+						Overloads: lo.Map(c.Overloads, func(o protocol.CommandOverload, i int) legacyprotocol.CommandOverload {
+							return legacyprotocol.CommandOverload{Parameters: lo.Map(o.Parameters, func(p protocol.CommandParameter, _ int) legacyprotocol.CommandParameter {
+								return legacyprotocol.CommandParameter{
+									Name:                p.Name,
+									Type:                p.Type,
+									Optional:            p.Optional,
+									CollapseEnumOptions: true,
+									Enum:                legacyprotocol.CommandEnum(p.Enum),
+									Suffix:              p.Suffix,
+								}
+							})}
+						}),
+					}
+				}),
+			},
+		}
+	case *packet.ClientBoundMapItemData:
+		pixels := make([][]color.RGBA, pk.Height)
+		pixels = append(pixels, pk.Pixels)
+		return []packet.Packet{
+			&legacypacket.ClientBoundMapItemData{
+				MapID:          pk.MapID,
+				UpdateFlags:    pk.UpdateFlags,
+				Dimension:      pk.Dimension,
+				LockedMap:      pk.LockedMap,
+				Scale:          pk.Scale,
+				MapsIncludedIn: pk.MapsIncludedIn,
+				TrackedObjects: pk.TrackedObjects,
+				Decorations:    pk.Decorations,
+				Height:         pk.Height,
+				Width:          pk.Width,
+				XOffset:        pk.XOffset,
+				YOffset:        pk.YOffset,
+				Pixels:         pixels,
+			},
+		}
+	case *packet.CraftingData:
+		return []packet.Packet{
+			&legacypacket.CraftingData{
+				Recipes:                      []protocol.Recipe{},
+				PotionRecipes:                []protocol.PotionRecipe{},
+				PotionContainerChangeRecipes: []protocol.PotionContainerChangeRecipe{},
+				ClearRecipes:                 pk.ClearRecipes,
+				//TODO: Translate these
+				//Recipes:                      pk.Recipes,
+				//PotionRecipes:                pk.PotionRecipes,
+				//PotionContainerChangeRecipes: pk.PotionContainerChangeRecipes,
+				//ClearRecipes:                 pk.ClearRecipes,
+			},
+		}
+	case *packet.CraftingEvent:
+		return []packet.Packet{
+			&legacypacket.CraftingEvent{
+				WindowID:     pk.WindowID,
+				CraftingType: pk.CraftingType,
+				RecipeUUID:   pk.RecipeUUID,
+				Input: lo.Map(pk.Input, func(instance protocol.ItemInstance, _ int) legacyprotocol.ItemStack {
+					return downgradeItem(instance.Stack)
+				}),
+				Output: lo.Map(pk.Output, func(instance protocol.ItemInstance, _ int) legacyprotocol.ItemStack {
+					return downgradeItem(instance.Stack)
+				}),
+			},
+		}
+	case *packet.CreativeContent:
+		return []packet.Packet{
+			&legacypacket.CreativeContent{
+				Items: lo.Map(pk.Items, func(instance protocol.CreativeItem, _ int) legacyprotocol.CreativeItem {
+					return legacyprotocol.CreativeItem{
+						//CreativeItemNetworkID: instance.CreativeItemNetworkID,
+						Item: downgradeItem(instance.Item),
+					}
+				}),
+			},
+		}
+	case *packet.Event:
+		return []packet.Packet{
+			&legacypacket.Event{
+				EntityRuntimeID: pk.EntityRuntimeID,
+				EventType:       pk.EventType,
+				UsePlayerID:     pk.UsePlayerID,
+			},
+		}
+	case *packet.GameRulesChanged:
+		return []packet.Packet{
+			&legacypacket.GameRulesChanged{
 				GameRules: lo.SliceToMap(pk.GameRules, func(rule protocol.GameRule) (string, any) {
 					return rule.Name, rule.Value
 				}),
+			},
+		}
+	case *packet.HurtArmour:
+		return []packet.Packet{
+			&legacypacket.HurtArmour{
+				Cause:  pk.Cause,
+				Damage: pk.Damage,
+			},
+		}
+	case *packet.InventoryContent:
+		return []packet.Packet{
+			&legacypacket.InventoryContent{
+				WindowID: pk.WindowID,
+				Content: lo.Map(pk.Content, func(instance protocol.ItemInstance, _ int) legacyprotocol.ItemInstance {
+					return legacyprotocol.ItemInstance{
+						Stack: downgradeItem(instance.Stack),
+					}
+				}),
+			},
+		}
+	case *packet.InventorySlot:
+		return []packet.Packet{
+			&legacypacket.InventorySlot{
+				WindowID: pk.WindowID,
+				Slot:     pk.Slot,
+				NewItem: legacyprotocol.ItemInstance{
+					Stack: downgradeItem(pk.NewItem.Stack),
+				},
 			},
 		}
 	case *packet.LevelChunk:
@@ -264,112 +445,14 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				SubChunkCount: uint32(len(data.SubChunks)),
 			},
 		}
-	case *packet.GameRulesChanged:
-		return []packet.Packet{
-			&legacypacket.GameRulesChanged{
-				GameRules: lo.SliceToMap(pk.GameRules, func(rule protocol.GameRule) (string, any) {
-					return rule.Name, rule.Value
-				}),
-			},
+	case *packet.LevelEvent:
+		if pk.EventType == packet.LevelEventParticlesDestroyBlock || pk.EventType == packet.LevelEventParticlesCrackBlock {
+			pk.EventData = int32(downgradeBlockRuntimeID(uint32(pk.EventData)))
 		}
-	case *packet.UpdateBlock:
-		pk.NewBlockRuntimeID = downgradeBlockRuntimeID(pk.NewBlockRuntimeID)
-	case *packet.UpdateBlockSynced:
-		pk.NewBlockRuntimeID = downgradeBlockRuntimeID(pk.NewBlockRuntimeID)
-	case *packet.NetworkChunkPublisherUpdate:
+	case *packet.MapInfoRequest:
 		return []packet.Packet{
-			&legacypacket.NetworkChunkPublisherUpdate{
-				Position: pk.Position,
-				Radius:   pk.Radius,
-			},
-		}
-	case *packet.MovePlayer:
-		return []packet.Packet{
-			&legacypacket.MovePlayer{
-				EntityRuntimeID:       pk.EntityRuntimeID,
-				Position:              pk.Position,
-				Pitch:                 pk.Pitch,
-				Yaw:                   pk.Yaw,
-				HeadYaw:               pk.HeadYaw,
-				Mode:                  pk.Mode,
-				OnGround:              pk.OnGround,
-				RiddenEntityRuntimeID: pk.RiddenEntityRuntimeID,
-				TeleportCause:         pk.TeleportCause,
-			},
-		}
-	case *packet.ActorPickRequest:
-		return []packet.Packet{
-			&legacypacket.ActorPickRequest{
-				EntityUniqueID: pk.EntityUniqueID,
-				HotBarSlot:     pk.HotBarSlot,
-			},
-		}
-	case *packet.AddActor:
-		return []packet.Packet{
-			&legacypacket.AddActor{
-				EntityMetadata:  pk.EntityMetadata,
-				EntityRuntimeID: pk.EntityRuntimeID,
-				EntityType:      pk.EntityType,
-				EntityUniqueID:  pk.EntityUniqueID,
-				HeadYaw:         pk.HeadYaw,
-				Pitch:           pk.Pitch,
-				Position:        pk.Position,
-				Velocity:        pk.Velocity,
-				Yaw:             pk.Yaw,
-				Attributes: lo.Map(pk.Attributes, func(a protocol.AttributeValue, _ int) legacyprotocol.Attribute {
-					return legacyprotocol.Attribute{
-						Name:  a.Name,
-						Value: a.Value,
-						Max:   a.Max,
-						Min:   a.Min,
-					}
-				}),
-				EntityLinks: lo.Map(pk.EntityLinks, func(l protocol.EntityLink, _ int) legacyprotocol.EntityLink {
-					return legacyprotocol.EntityLink{
-						Type:                 l.Type,
-						RiddenEntityUniqueID: l.RiddenEntityUniqueID,
-						RiderEntityUniqueID:  l.RiddenEntityUniqueID,
-						Immediate:            l.Immediate,
-					}
-				}),
-			},
-		}
-	case *packet.AddPlayer:
-		return []packet.Packet{
-			&legacypacket.AddPlayer{
-				UUID:                   pk.UUID,
-				Username:               pk.Username,
-				EntityUniqueID:         pk.AbilityData.EntityUniqueID,
-				EntityRuntimeID:        pk.EntityRuntimeID,
-				PlatformChatID:         pk.PlatformChatID,
-				Position:               pk.Position,
-				Velocity:               pk.Velocity,
-				Pitch:                  pk.Pitch,
-				Yaw:                    pk.Yaw,
-				HeadYaw:                pk.HeadYaw,
-				HeldItem:               downgradeItem(pk.HeldItem.Stack),
-				EntityMetadata:         pk.EntityMetadata,
-				CommandPermissionLevel: uint32(pk.AbilityData.CommandPermissions),
-				PermissionLevel:        uint32(pk.AbilityData.PlayerPermissions),
-				DeviceID:               pk.DeviceID,
-				EntityLinks: lo.Map(pk.EntityLinks, func(l protocol.EntityLink, _ int) legacyprotocol.EntityLink {
-					return legacyprotocol.EntityLink{
-						Type:                 l.Type,
-						RiddenEntityUniqueID: l.RiddenEntityUniqueID,
-						RiderEntityUniqueID:  l.RiddenEntityUniqueID,
-						Immediate:            l.Immediate,
-					}
-				}),
-			},
-		}
-	case *packet.MobEquipment:
-		return []packet.Packet{
-			&legacypacket.MobEquipment{
-				EntityRuntimeID: pk.EntityRuntimeID,
-				NewItem:         downgradeItem(pk.NewItem.Stack),
-				InventorySlot:   pk.InventorySlot,
-				HotBarSlot:      pk.HotBarSlot,
-				WindowID:        pk.WindowID,
+			&legacypacket.MapInfoRequest{
+				MapID: pk.MapID,
 			},
 		}
 	case *packet.MobArmourEquipment:
@@ -382,22 +465,27 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				Boots:           downgradeItem(pk.Boots.Stack),
 			},
 		}
-	case *packet.AddItemActor:
+	case *packet.MobEquipment:
 		return []packet.Packet{
-			&legacypacket.AddItemActor{
-				EntityUniqueID:  pk.EntityUniqueID,
+			&legacypacket.MobEquipment{
 				EntityRuntimeID: pk.EntityRuntimeID,
-				Item:            downgradeItem(pk.Item.Stack),
-				Position:        pk.Position,
-				Velocity:        pk.Velocity,
-				EntityMetadata:  pk.EntityMetadata,
-				FromFishing:     pk.FromFishing,
+				NewItem:         downgradeItem(pk.NewItem.Stack),
+				InventorySlot:   pk.InventorySlot,
+				HotBarSlot:      pk.HotBarSlot,
+				WindowID:        pk.WindowID,
 			},
 		}
-	case *packet.ContainerClose:
+	case *packet.NetworkChunkPublisherUpdate:
 		return []packet.Packet{
-			&legacypacket.ContainerClose{
-				WindowID: pk.WindowID,
+			&legacypacket.NetworkChunkPublisherUpdate{
+				Position: pk.Position,
+				Radius:   pk.Radius,
+			},
+		}
+	case *packet.NetworkSettings:
+		return []packet.Packet{
+			&legacypacket.NetworkSettings{
+				CompressionThreshold: pk.CompressionThreshold,
 			},
 		}
 	case *packet.PlayerList:
@@ -405,25 +493,112 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			&legacypacket.PlayerList{
 				ActionType: pk.ActionType,
 				Entries: lo.Map(pk.Entries, func(e protocol.PlayerListEntry, _ int) legacypacket.PlayerListEntry {
-					var patch struct {
-						Geometry struct {
-							Default string
-						}
-					}
-					_ = json.Unmarshal(e.Skin.SkinResourcePatch, &patch)
 					return legacypacket.PlayerListEntry{
-						UUID:             e.UUID,
-						EntityUniqueID:   e.EntityUniqueID,
-						Username:         e.Username,
-						SkinID:           e.Skin.SkinID,
-						SkinData:         e.Skin.SkinData,
-						CapeData:         e.Skin.CapeData,
-						SkinGeometryName: patch.Geometry.Default,
-						SkinGeometry:     e.Skin.SkinGeometry,
-						PlatformChatID:   e.PlatformChatID,
-						XUID:             e.XUID,
+						UUID:           e.UUID,
+						EntityUniqueID: e.EntityUniqueID,
+						Username:       e.Username,
+						XUID:           e.XUID,
+						PlatformChatID: e.PlatformChatID,
+						BuildPlatform:  e.BuildPlatform,
+						Skin:           legacyprotocol.LegacySkin(e.Skin),
+						Teacher:        e.Teacher,
+						Host:           e.Host,
 					}
 				}),
+			},
+		}
+	case *packet.PlayerSkin:
+		return []packet.Packet{
+			&legacypacket.PlayerSkin{
+				UUID:        pk.UUID,
+				Skin:        legacyprotocol.LegacySkin(pk.Skin),
+				NewSkinName: pk.NewSkinName,
+				OldSkinName: pk.OldSkinName,
+			},
+		}
+	case *packet.ResourcePacksInfo:
+		return []packet.Packet{
+			&legacypacket.ResourcePacksInfo{
+				TexturePackRequired: pk.TexturePackRequired,
+				HasScripts:          pk.HasScripts,
+				BehaviourPacks:      pk.BehaviourPacks,
+				TexturePacks: lo.Map(pk.TexturePacks, func(pack protocol.TexturePackInfo, _ int) legacyprotocol.ResourcePackInfo {
+					return legacyprotocol.ResourcePackInfo{
+						UUID:            pack.UUID,
+						Version:         pack.Version,
+						Size:            pack.Size,
+						ContentKey:      pack.ContentKey,
+						SubPackName:     pack.SubPackName,
+						ContentIdentity: pack.ContentIdentity,
+						HasScripts:      pack.HasScripts,
+					}
+				}),
+			},
+		}
+	case *packet.StartGame:
+		// TODO: Adjust our mappings to account for any possible custom blocks.
+		return []packet.Packet{
+			&legacypacket.StartGame{
+				EntityUniqueID:                 pk.EntityUniqueID,
+				EntityRuntimeID:                pk.EntityRuntimeID,
+				PlayerGameMode:                 pk.PlayerGameMode,
+				PlayerPosition:                 pk.PlayerPosition,
+				Pitch:                          pk.Pitch,
+				Yaw:                            pk.Yaw,
+				WorldSeed:                      int32(pk.WorldSeed),
+				SpawnBiomeType:                 pk.SpawnBiomeType,
+				UserDefinedBiomeName:           pk.UserDefinedBiomeName,
+				Dimension:                      pk.Dimension,
+				Generator:                      pk.Generator,
+				WorldGameMode:                  pk.WorldGameMode,
+				Difficulty:                     pk.Difficulty,
+				WorldSpawn:                     pk.WorldSpawn,
+				AchievementsDisabled:           pk.AchievementsDisabled,
+				DayCycleLockTime:               pk.DayCycleLockTime,
+				EducationEditionOffer:          pk.EducationEditionOffer,
+				EducationFeaturesEnabled:       pk.EducationFeaturesEnabled,
+				EducationProductID:             pk.EducationProductID,
+				RainLevel:                      pk.RainLevel,
+				LightningLevel:                 pk.LightningLevel,
+				ConfirmedPlatformLockedContent: pk.ConfirmedPlatformLockedContent,
+				MultiPlayerGame:                pk.MultiPlayerGame,
+				LANBroadcastEnabled:            pk.LANBroadcastEnabled,
+				XBLBroadcastMode:               pk.XBLBroadcastMode,
+				PlatformBroadcastMode:          pk.PlatformBroadcastMode,
+				CommandsEnabled:                pk.CommandsEnabled,
+				TexturePackRequired:            pk.TexturePackRequired,
+				GameRules: lo.SliceToMap(pk.GameRules, func(rule protocol.GameRule) (string, any) {
+					return rule.Name, rule.Value
+				}),
+				Experiments:                     pk.Experiments,
+				ExperimentsPreviouslyToggled:    pk.ExperimentsPreviouslyToggled,
+				BonusChestEnabled:               pk.BonusChestEnabled,
+				StartWithMapEnabled:             pk.StartWithMapEnabled,
+				PlayerPermissions:               pk.PlayerPermissions,
+				ServerChunkTickRadius:           pk.ServerChunkTickRadius,
+				HasLockedBehaviourPack:          pk.HasLockedBehaviourPack,
+				HasLockedTexturePack:            pk.HasLockedTexturePack,
+				FromLockedWorldTemplate:         pk.FromLockedWorldTemplate,
+				MSAGamerTagsOnly:                pk.MSAGamerTagsOnly,
+				FromWorldTemplate:               pk.FromWorldTemplate,
+				WorldTemplateSettingsLocked:     pk.WorldTemplateSettingsLocked,
+				OnlySpawnV1Villagers:            pk.OnlySpawnV1Villagers,
+				BaseGameVersion:                 pk.BaseGameVersion,
+				LimitedWorldWidth:               pk.LimitedWorldWidth,
+				LimitedWorldDepth:               pk.LimitedWorldDepth,
+				NewNether:                       pk.NewNether,
+				ForceExperimentalGameplay:       pk.ForceExperimentalGameplay,
+				LevelID:                         pk.LevelID,
+				WorldName:                       pk.WorldName,
+				TemplateContentIdentity:         pk.TemplateContentIdentity,
+				Trial:                           pk.Trial,
+				ServerAuthoritativeMovementMode: uint32(pk.PlayerMovementSettings.MovementType),
+				Time:                            pk.Time,
+				EnchantmentSeed:                 pk.EnchantmentSeed,
+				MultiPlayerCorrelationID:        pk.MultiPlayerCorrelationID,
+				Blocks:                          legacymappings.Blocks(),
+				Items:                           legacymappings.Items(),
+				ServerAuthoritativeInventory:    pk.ServerAuthoritativeInventory,
 			},
 		}
 	case *packet.UpdateAbilities:
@@ -489,146 +664,15 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 						Default: attribute.Default,
 					}
 				}),
+				Tick: pk.Tick,
 			},
 		}
-	case *packet.SetActorData:
-		return []packet.Packet{
-			&legacypacket.SetActorData{
-				EntityRuntimeID: pk.EntityRuntimeID,
-				EntityMetadata:  pk.EntityMetadata,
-			},
-		}
-	case *packet.InventorySlot:
-		return []packet.Packet{
-			&legacypacket.InventorySlot{
-				WindowID: pk.WindowID,
-				Slot:     pk.Slot,
-				NewItem:  downgradeItem(pk.NewItem.Stack),
-			},
-		}
-	case *packet.InventoryContent:
-		return []packet.Packet{
-			&legacypacket.InventoryContent{
-				WindowID: pk.WindowID,
-				Content: lo.Map(pk.Content, func(instance protocol.ItemInstance, _ int) legacyprotocol.ItemStack {
-					return downgradeItem(instance.Stack)
-				}),
-			},
-		}
-	case *packet.ResourcePacksInfo:
-		return []packet.Packet{
-			&legacypacket.ResourcePacksInfo{
-				TexturePackRequired: pk.TexturePackRequired,
-				HasScripts:          pk.HasScripts,
-				BehaviourPacks: lo.Map(pk.BehaviourPacks, func(pack protocol.BehaviourPackInfo, _ int) legacyprotocol.ResourcePackInfo {
-					return legacyprotocol.ResourcePackInfo{
-						UUID:            pack.UUID,
-						Version:         pack.Version,
-						Size:            pack.Size,
-						ContentKey:      pack.ContentKey,
-						SubPackName:     pack.SubPackName,
-						ContentIdentity: pack.ContentIdentity,
-						HasScripts:      pack.HasScripts,
-					}
-				}),
-				TexturePacks: lo.Map(pk.TexturePacks, func(pack protocol.TexturePackInfo, _ int) legacyprotocol.ResourcePackInfo {
-					return legacyprotocol.ResourcePackInfo{
-						UUID:            pack.UUID,
-						Version:         pack.Version,
-						Size:            pack.Size,
-						ContentKey:      pack.ContentKey,
-						SubPackName:     pack.SubPackName,
-						ContentIdentity: pack.ContentIdentity,
-						HasScripts:      pack.HasScripts,
-					}
-				}),
-			},
-		}
-	case *packet.ResourcePackStack:
-		return []packet.Packet{
-			&legacypacket.ResourcePackStack{
-				TexturePackRequired: pk.TexturePackRequired,
-				BehaviourPacks:      pk.BehaviourPacks,
-				TexturePacks:        pk.TexturePacks,
-				Experimental:        len(pk.Experiments) > 0,
-			},
-		}
-	case *packet.ResourcePackChunkData:
-		return []packet.Packet{
-			&legacypacket.ResourcePackChunkData{
-				UUID:       pk.UUID,
-				ChunkIndex: pk.ChunkIndex,
-				DataOffset: pk.DataOffset,
-				Data:       pk.Data,
-			},
-		}
-	case *packet.LevelEvent:
-		if pk.EventType == packet.LevelEventParticlesDestroyBlock || pk.EventType == packet.LevelEventParticlesCrackBlock {
-			pk.EventData = int32(downgradeBlockRuntimeID(uint32(pk.EventData)))
-		}
-	case *packet.AvailableCommands:
-		return []packet.Packet{
-			&legacypacket.AvailableCommands{
-				Commands: lo.Map(pk.Commands, func(c protocol.Command, _ int) legacyprotocol.Command {
-					return legacyprotocol.Command{
-						Name:            c.Name,
-						Description:     c.Description,
-						Flags:           byte(c.Flags),
-						PermissionLevel: c.PermissionLevel,
-						Aliases:         c.Aliases,
-						Overloads: lo.Map(c.Overloads, func(o protocol.CommandOverload, i int) legacyprotocol.CommandOverload {
-							return legacyprotocol.CommandOverload{Parameters: lo.Map(o.Parameters, func(p protocol.CommandParameter, _ int) legacyprotocol.CommandParameter {
-								return legacyprotocol.CommandParameter{
-									Name:                p.Name,
-									Type:                p.Type,
-									Optional:            p.Optional,
-									CollapseEnumOptions: true,
-									Enum:                legacyprotocol.CommandEnum(p.Enum),
-									Suffix:              p.Suffix,
-								}
-							})}
-						}),
-					}
-				}),
-			},
-		}
-	case *packet.CreativeContent:
-		return []packet.Packet{
-			&legacypacket.InventoryContent{
-				WindowID: 121,
-				Content: lo.Map(pk.Items, func(instance protocol.CreativeItem, _ int) legacyprotocol.ItemStack {
-					return downgradeItem(instance.Item)
-				}),
-			},
-		}
-	case *packet.LevelSoundEvent:
-		if pk.SoundType == 113 || pk.SoundType == 145 || pk.SoundType == 151 || pk.SoundType <= 198 && pk.SoundType >= 195 || pk.SoundType == 222 || pk.SoundType == 227 {
-			return nil
-		}
-	case *packet.PlayerSkin:
-		var patch struct {
-			Geometry struct {
-				Default string
-			}
-		}
-		_ = json.Unmarshal(pk.Skin.SkinResourcePatch, &patch)
-		return []packet.Packet{
-			&legacypacket.PlayerSkin{
-				UUID:             pk.UUID,
-				SkinID:           pk.Skin.SkinID,
-				NewSkinName:      pk.NewSkinName,
-				OldSkinName:      pk.OldSkinName,
-				SkinData:         pk.Skin.SkinData,
-				CapeData:         pk.Skin.CapeData,
-				SkinGeometryName: patch.Geometry.Default,
-				SkinGeometry:     pk.Skin.SkinGeometry,
-				PremiumSkin:      pk.Skin.PremiumSkin,
-			},
-		}
-	case *packet.Animate:
-		if pk.ActionType > 4 { // TODO: This is also pretty fucking ugly
-			return []packet.Packet{}
-		}
+	case *packet.UpdateBlock:
+		pk.NewBlockRuntimeID = downgradeBlockRuntimeID(pk.NewBlockRuntimeID)
+	case *packet.UpdateBlockSynced:
+		pk.NewBlockRuntimeID = downgradeBlockRuntimeID(pk.NewBlockRuntimeID)
+	case *packet.UpdateAdventureSettings:
+		return nil
 	}
 	return []packet.Packet{pk}
 }
@@ -636,7 +680,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 var (
 	// latestAirRID is the runtime ID of the air block in the latest version of the game.
 	latestAirRID, _ = latestmappings.StateToRuntimeID("minecraft:air", nil)
-	// legacyAirRID is the runtime ID of the air block in the v1.12.0 version.
+	// legacyAirRID is the runtime ID of the air block in the v1.16.100 version.
 	legacyAirRID = legacymappings.StateToRuntimeID("minecraft:air", nil)
 )
 
@@ -651,7 +695,6 @@ func downgradeItem(input protocol.ItemStack) legacyprotocol.ItemStack {
 			MetadataValue: int16(input.MetadataValue),
 		},
 		Count:         int16(input.Count),
-		NBTData:       input.NBTData,
 		CanBePlacedOn: input.CanBePlacedOn,
 		CanBreak:      input.CanBreak,
 	}
@@ -677,7 +720,7 @@ func upgradeItem(input legacyprotocol.ItemStack) protocol.ItemStack {
 	}
 }
 
-// downgradeBlockRuntimeID downgrades a v1.19.0 block runtime ID to a v1.12.0 block runtime ID.
+// downgradeBlockRuntimeID downgrades a v1.19.0 block runtime ID to a v1.16.100 block runtime ID.
 func downgradeBlockRuntimeID(input uint32) uint32 {
 	name, properties, ok := latestmappings.RuntimeIDToState(input)
 	if !ok {
@@ -686,7 +729,7 @@ func downgradeBlockRuntimeID(input uint32) uint32 {
 	return legacymappings.StateToRuntimeID(name, properties)
 }
 
-// upgradeBlockRuntimeID upgrades a v1.12.0 block runtime ID to a v1.19.0 block runtime ID.
+// upgradeBlockRuntimeID upgrades a v1.16.100 block runtime ID to a v1.19.0 block runtime ID.
 func upgradeBlockRuntimeID(input uint32) uint32 {
 	name, properties, ok := legacymappings.RuntimeIDToState(input)
 	if !ok {
@@ -699,7 +742,7 @@ func upgradeBlockRuntimeID(input uint32) uint32 {
 	return runtimeID
 }
 
-// downgradeChunk downgrades a chunk from the latest version to the v1.12.0 equivalent.
+// downgradeChunk downgrades a chunk from the latest version to the v1.16.100 equivalent.
 func downgradeChunk(chunk *chunk.Chunk) *legacychunk.Chunk {
 	// First downgrade the blocks.
 	downgraded := legacychunk.New(legacyAirRID)

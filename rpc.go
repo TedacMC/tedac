@@ -23,11 +23,11 @@ func (a *App) startRPC() {
 		case <-t.C:
 			err = client.SetActivity(client.Activity{
 				State:      a.remoteAddress,
-				Details:    "Playing Minecraft: Bedrock Edition on 1.12",
+				Details:    "Playing Minecraft: Bedrock Edition on 1.16",
 				LargeImage: "tedac",
 				LargeText:  "TedacMC",
 				SmallImage: "mc",
-				SmallText:  "Minecraft 1.12 Support",
+				SmallText:  "Minecraft 1.16 Support",
 				Timestamps: &client.Timestamps{
 					Start: &start,
 				},

@@ -15,7 +15,7 @@ type InventoryContent struct {
 	WindowID uint32
 	// Content is the new content of the inventory. The length of this slice must be equal to the full size of
 	// the inventory window updated.
-	Content []legacyprotocol.ItemStack
+	Content []legacyprotocol.ItemInstance
 }
 
 // ID ...
@@ -26,15 +26,15 @@ func (*InventoryContent) ID() uint32 {
 // Marshal ...
 func (pk *InventoryContent) Marshal(w *protocol.Writer) {
 	w.Varuint32(&pk.WindowID)
-	protocol.FuncSlice(w, &pk.Content, func(stack *legacyprotocol.ItemStack) {
-		legacyprotocol.WriteItem(w, stack)
+	protocol.FuncSlice(w, &pk.Content, func(instance *legacyprotocol.ItemInstance) {
+		legacyprotocol.WriteItemInst(w, instance)
 	})
 }
 
 // Unmarshal ...
 func (pk *InventoryContent) Unmarshal(r *protocol.Reader) {
 	r.Varuint32(&pk.WindowID)
-	protocol.FuncSlice(r, &pk.Content, func(stack *legacyprotocol.ItemStack) {
-		legacyprotocol.Item(r, stack)
+	protocol.FuncSlice(r, &pk.Content, func(instance *legacyprotocol.ItemInstance) {
+		legacyprotocol.ItemInst(r, instance)
 	})
 }

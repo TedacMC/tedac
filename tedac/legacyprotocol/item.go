@@ -6,6 +6,35 @@ import (
 	"github.com/tedacmc/tedac/tedac/legacymappings"
 )
 
+// ItemInstance represents a unique instance of an item stack. These instances carry a specific network ID
+// that is persistent for the stack.
+type ItemInstance struct {
+	// StackNetworkID is the network ID of the item stack. If the stack is empty, 0 is always written for this
+	// field. If not, the field should be set to 1 if the server authoritative inventories are disabled in the
+	// StartGame packet, or to a unique stack ID if it is enabled.
+	StackNetworkID int32
+	// Stack is the actual item stack of the item instance.
+	Stack ItemStack
+}
+
+// ItemInst reads an item instance from buffer src and stores it into item instance x.
+func ItemInst(r *protocol.Reader, x *ItemInstance) {
+	r.Varint32(&x.StackNetworkID)
+	Item(r, &x.Stack)
+	if (x.Stack.Count == 0 || x.Stack.NetworkID == 0) && x.StackNetworkID != 0 {
+		r.InvalidValue(x.StackNetworkID, "stack network ID", "stack is empty but network ID is non-zero")
+	}
+}
+
+// WriteItemInst writes an item instance x to buffer dst.
+func WriteItemInst(w *protocol.Writer, x *ItemInstance) {
+	w.Varint32(&x.StackNetworkID)
+	WriteItem(w, &x.Stack)
+	if (x.Stack.Count == 0 || x.Stack.NetworkID == 0) && x.StackNetworkID != 0 {
+		w.InvalidValue(x.StackNetworkID, "stack network ID", "stack is empty but network ID is non-zero")
+	}
+}
+
 // ItemStack represents an item instance/stack over network. It has a network ID and a metadata value that
 // define its type.
 type ItemStack struct {
@@ -32,7 +61,7 @@ type ItemType struct {
 	MetadataValue int16
 }
 
-// shieldID represents the ID of a shield in the 1.12 item table.
+// shieldID represents the ID of a shield in the 1.16 item table.
 var shieldID, _ = legacymappings.ItemIDByName("minecraft:shield")
 
 // Item reads an item stack from buffer src and stores it into item stack x.
@@ -83,7 +112,6 @@ func Item(r *protocol.Reader, x *ItemStack) {
 	for i := int32(0); i < count; i++ {
 		r.String(&x.CanBreak[i])
 	}
-
 	if x.NetworkID == int32(shieldID) {
 		var blockingTick int64
 		r.Varint64(&blockingTick)
@@ -122,7 +150,6 @@ func WriteItem(w *protocol.Writer, x *ItemStack) {
 	for _, block := range x.CanBreak {
 		w.String(&block)
 	}
-
 	if x.NetworkID == int32(shieldID) {
 		var blockingTick int64
 		w.Varint64(&blockingTick)

@@ -4,7 +4,6 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/tedacmc/tedac/tedac/legacymappings"
 	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 )
 
@@ -22,6 +21,8 @@ type StartGame struct {
 	// PlayerGameMode is the game mode the player currently has. It is a value from 0-4, with 0 being
 	// survival mode, 1 being creative mode, 2 being adventure mode, 3 being survival spectator and 4 being
 	// creative spectator.
+	// This field may be set to 5 to make the client fall back to the game mode set in the WorldGameMode
+	// field.
 	PlayerGameMode int32
 	// PlayerPosition is the spawn position of the player in the world. In servers this is often the same as
 	// the world's spawn position found below.
@@ -34,6 +35,12 @@ type StartGame struct {
 	// WorldSeed is the seed used to generate the world. Unlike in PC edition, the seed is a 32bit integer
 	// here.
 	WorldSeed int32
+	// SpawnBiomeType specifies if the biome that the player spawns in is user defined (through behaviour
+	// packs) or builtin. See the constants above.
+	SpawnBiomeType int16
+	// UserDefinedBiomeName is a readable name of the biome that the player spawned in, such as 'plains'. This
+	// might be a custom biome name if any custom biomes are present through behaviour packs.
+	UserDefinedBiomeName string
 	// Dimension is the ID of the dimension that the player spawns in. It is a value from 0-2, with 0 being
 	// the overworld, 1 being the nether and 2 being the end.
 	Dimension int32
@@ -41,8 +48,8 @@ type StartGame struct {
 	// 1 being infinite worlds, 2 being flat worlds, 3 being nether worlds and 4 being end worlds. A value of
 	// 0 will actually make the client stop rendering chunks you send beyond the world limit.
 	Generator int32
-	// WorldGameMode is the game mode that a player gets when it first spawns in the world. It has no effect
-	// on the actual game mode the player spawns with. See PlayerGameMode for that.
+	// WorldGameMode is the game mode that a player gets when it first spawns in the world. It is shown in the
+	// settings and is used if the PlayerGameMode is set to 5.
 	WorldGameMode int32
 	// Difficulty is the difficulty of the world. It is a value from 0-3, with 0 being peaceful, 1 being easy,
 	// 2 being normal and 3 being hard.
@@ -57,13 +64,16 @@ type StartGame struct {
 	// DayCycleLockTime is the time at which the day cycle was locked if the day cycle is disabled using the
 	// respective game rule. The client will maintain this time as long as the day cycle is disabled.
 	DayCycleLockTime int32
-	// EducationMode specifies if the world is specifically for education edition clients. Setting this to
-	// true for normal editions actually temporarily 'transforms' the client into Education Edition, with even
-	// the ability to see that title on the home screen.
-	EducationMode bool
+	// EducationEditionOffer is some Minecraft: Education Edition field that specifies what 'region' the world
+	// was from, with 0 being None, 1 being RestOfWorld, and 2 being China.
+	// The actual use of this field is unknown.
+	EducationEditionOffer int32
 	// EducationFeaturesEnabled specifies if the world has education edition features enabled, such as the
 	// blocks or entities specific to education edition.
 	EducationFeaturesEnabled bool
+	// EducationProductID is a UUID used to identify the education edition server instance. It is generally
+	// unique for education edition servers.
+	EducationProductID string
 	// RainLevel is the level specifying the intensity of the rain falling. When set to 0, no rain falls at
 	// all.
 	RainLevel float32
@@ -92,6 +102,12 @@ type StartGame struct {
 	// rules may be either 'bool', 'int32' or 'float32'. Some game rules are server side only, and don't
 	// necessarily need to be sent to the client.
 	GameRules map[string]any
+	// Experiments holds a list of experiments that are either enabled or disabled in the world that the
+	// player spawns in.
+	Experiments []protocol.ExperimentData
+	// ExperimentsPreviouslyToggled specifies if any experiments were previously toggled in this world. It is
+	// probably used for some kind of metrics.
+	ExperimentsPreviouslyToggled bool
 	// BonusChestEnabled specifies if the world had the bonus map setting enabled when generating it. It does
 	// not have any effect client-side.
 	BonusChestEnabled bool
@@ -128,34 +144,54 @@ type StartGame struct {
 	// OnlySpawnV1Villagers is a hack that Mojang put in place to preserve backwards compatibility with old
 	// villagers. The bool is never actually read though, so it has no functionality.
 	OnlySpawnV1Villagers bool
+	// BaseGameVersion is the version of the game from which Vanilla features will be used. The exact function
+	// of this field isn't clear.
+	BaseGameVersion string
+	// LimitedWorldWidth and LimitedWorldDepth are the dimensions of the world if the world is a limited
+	// world. For unlimited worlds, these may simply be left as 0.
+	LimitedWorldWidth, LimitedWorldDepth int32
+	// NewNether specifies if the server runs with the new nether introduced in the 1.16 update.
+	NewNether bool
+	// ForceExperimentalGameplay specifies if experimental gameplay should be force enabled. For servers this
+	// should always be set to false.
+	ForceExperimentalGameplay protocol.Optional[bool]
 	// LevelID is a base64 encoded world ID that is used to identify the world.
 	LevelID string
 	// WorldName is the name of the world that the player is joining. Note that this field shows up above the
 	// player list for the rest of the game session, and cannot be changed. Setting the server name to this
 	// field is recommended.
 	WorldName string
-	// PremiumWorldTemplateID is a UUID specific to the premium world template that might have been used to
+	// TemplateContentIdentity is a UUID specific to the premium world template that might have been used to
 	// generate the world. Servers should always fill out an empty string for this.
-	PremiumWorldTemplateID string
+	TemplateContentIdentity string
 	// Trial specifies if the world was a trial world, meaning features are limited and there is a time limit
 	// on the world.
 	Trial bool
+	// ServerAuthoritativeMovementMode specifies if the server is authoritative over the movement of the player,
+	// meaning it controls the movement of it.
+	// In reality, the only thing that changes when this field is set to true is the packet sent by the player
+	// when it moves. When set to AuthoritativeMovementModeServer or
+	// AuthoritativeMovementModeServerWithRewind, it will send the PlayerAuthInput packet instead of the
+	// MovePlayer packet.
+	ServerAuthoritativeMovementMode uint32
 	// Time is the total time that has elapsed since the start of the world.
 	Time int64
 	// EnchantmentSeed is the seed used to seed the random used to produce enchantments in the enchantment
 	// table. Note that the exact correct random implementation must be used to produce the correct results
 	// both client- and server-side.
 	EnchantmentSeed int32
-	// Blocks is a list of all blocks and variants existing in the game. Failing to send any of the blocks
-	// that are in the game, including any specific variants of that block, will crash mobile clients. It
-	// seems Windows 10 games do not crash.
-	Blocks []legacymappings.BlockEntry
+	// Blocks is a list of all custom blocks registered on the server.
+	Blocks []protocol.BlockEntry
 	// Items is a list of all items with their legacy IDs which are available in the game. Failing to send any
 	// of the items that are in the game will crash mobile clients.
-	Items []legacymappings.ItemEntry
+	Items []protocol.ItemEntry
 	// MultiPlayerCorrelationID is a unique ID specifying the multi-player session of the player. A random
 	// UUID should be filled out for this field.
 	MultiPlayerCorrelationID string
+	// ServerAuthoritativeInventory specifies if the server authoritative inventory system is enabled. This
+	// is a new system introduced in 1.16. Backwards compatibility with the inventory transactions has to
+	// some extent been preserved, but will eventually be removed.
+	ServerAuthoritativeInventory bool
 }
 
 // ID ...
@@ -172,6 +208,8 @@ func (pk *StartGame) Marshal(w *protocol.Writer) {
 	w.Float32(&pk.Pitch)
 	w.Float32(&pk.Yaw)
 	w.Varint32(&pk.WorldSeed)
+	w.Int16(&pk.SpawnBiomeType)
+	w.String(&pk.UserDefinedBiomeName)
 	w.Varint32(&pk.Dimension)
 	w.Varint32(&pk.Generator)
 	w.Varint32(&pk.WorldGameMode)
@@ -179,8 +217,9 @@ func (pk *StartGame) Marshal(w *protocol.Writer) {
 	w.UBlockPos(&pk.WorldSpawn)
 	w.Bool(&pk.AchievementsDisabled)
 	w.Varint32(&pk.DayCycleLockTime)
-	w.Bool(&pk.EducationMode)
+	w.Varint32(&pk.EducationEditionOffer)
 	w.Bool(&pk.EducationFeaturesEnabled)
+	w.String(&pk.EducationProductID)
 	w.Float32(&pk.RainLevel)
 	w.Float32(&pk.LightningLevel)
 	w.Bool(&pk.ConfirmedPlatformLockedContent)
@@ -191,6 +230,8 @@ func (pk *StartGame) Marshal(w *protocol.Writer) {
 	w.Bool(&pk.CommandsEnabled)
 	w.Bool(&pk.TexturePackRequired)
 	legacyprotocol.WriteGameRules(w, &pk.GameRules)
+	protocol.SliceUint32Length(w, &pk.Experiments)
+	w.Bool(&pk.ExperimentsPreviouslyToggled)
 	w.Bool(&pk.BonusChestEnabled)
 	w.Bool(&pk.StartWithMapEnabled)
 	w.Varint32(&pk.PlayerPermissions)
@@ -202,21 +243,27 @@ func (pk *StartGame) Marshal(w *protocol.Writer) {
 	w.Bool(&pk.FromWorldTemplate)
 	w.Bool(&pk.WorldTemplateSettingsLocked)
 	w.Bool(&pk.OnlySpawnV1Villagers)
+	w.String(&pk.BaseGameVersion)
+	w.Int32(&pk.LimitedWorldWidth)
+	w.Int32(&pk.LimitedWorldDepth)
+	w.Bool(&pk.NewNether)
+	protocol.OptionalFunc(w, &pk.ForceExperimentalGameplay, w.Bool)
 	w.String(&pk.LevelID)
 	w.String(&pk.WorldName)
-	w.String(&pk.PremiumWorldTemplateID)
+	w.String(&pk.TemplateContentIdentity)
 	w.Bool(&pk.Trial)
+	w.Varuint32(&pk.ServerAuthoritativeMovementMode)
 	w.Int64(&pk.Time)
 	w.Varint32(&pk.EnchantmentSeed)
 	protocol.Slice(w, &pk.Blocks)
 	protocol.Slice(w, &pk.Items)
 	w.String(&pk.MultiPlayerCorrelationID)
+	w.Bool(&pk.ServerAuthoritativeInventory)
 }
 
 // Unmarshal ...
 func (pk *StartGame) Unmarshal(r *protocol.Reader) {
 	pk.GameRules = make(map[string]any)
-
 	r.Varint64(&pk.EntityUniqueID)
 	r.Varuint64(&pk.EntityRuntimeID)
 	r.Varint32(&pk.PlayerGameMode)
@@ -224,6 +271,8 @@ func (pk *StartGame) Unmarshal(r *protocol.Reader) {
 	r.Float32(&pk.Pitch)
 	r.Float32(&pk.Yaw)
 	r.Varint32(&pk.WorldSeed)
+	r.Int16(&pk.SpawnBiomeType)
+	r.String(&pk.UserDefinedBiomeName)
 	r.Varint32(&pk.Dimension)
 	r.Varint32(&pk.Generator)
 	r.Varint32(&pk.WorldGameMode)
@@ -231,8 +280,9 @@ func (pk *StartGame) Unmarshal(r *protocol.Reader) {
 	r.UBlockPos(&pk.WorldSpawn)
 	r.Bool(&pk.AchievementsDisabled)
 	r.Varint32(&pk.DayCycleLockTime)
-	r.Bool(&pk.EducationMode)
+	r.Varint32(&pk.EducationEditionOffer)
 	r.Bool(&pk.EducationFeaturesEnabled)
+	r.String(&pk.EducationProductID)
 	r.Float32(&pk.RainLevel)
 	r.Float32(&pk.LightningLevel)
 	r.Bool(&pk.ConfirmedPlatformLockedContent)
@@ -243,6 +293,8 @@ func (pk *StartGame) Unmarshal(r *protocol.Reader) {
 	r.Bool(&pk.CommandsEnabled)
 	r.Bool(&pk.TexturePackRequired)
 	legacyprotocol.GameRules(r, &pk.GameRules)
+	protocol.SliceUint32Length(r, &pk.Experiments)
+	r.Bool(&pk.ExperimentsPreviouslyToggled)
 	r.Bool(&pk.BonusChestEnabled)
 	r.Bool(&pk.StartWithMapEnabled)
 	r.Varint32(&pk.PlayerPermissions)
@@ -254,13 +306,20 @@ func (pk *StartGame) Unmarshal(r *protocol.Reader) {
 	r.Bool(&pk.FromWorldTemplate)
 	r.Bool(&pk.WorldTemplateSettingsLocked)
 	r.Bool(&pk.OnlySpawnV1Villagers)
+	r.String(&pk.BaseGameVersion)
+	r.Int32(&pk.LimitedWorldWidth)
+	r.Int32(&pk.LimitedWorldDepth)
+	r.Bool(&pk.NewNether)
+	protocol.OptionalFunc(r, &pk.ForceExperimentalGameplay, r.Bool)
 	r.String(&pk.LevelID)
 	r.String(&pk.WorldName)
-	r.String(&pk.PremiumWorldTemplateID)
+	r.String(&pk.TemplateContentIdentity)
 	r.Bool(&pk.Trial)
+	r.Varuint32(&pk.ServerAuthoritativeMovementMode)
 	r.Int64(&pk.Time)
 	r.Varint32(&pk.EnchantmentSeed)
 	protocol.Slice(r, &pk.Blocks)
 	protocol.Slice(r, &pk.Items)
 	r.String(&pk.MultiPlayerCorrelationID)
+	r.Bool(&pk.ServerAuthoritativeInventory)
 }

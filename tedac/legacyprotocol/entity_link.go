@@ -15,6 +15,9 @@ type EntityLink struct {
 	// Immediate is set to immediately dismount an entity from another. This should be set when the mount of
 	// an entity is killed.
 	Immediate bool
+	// RiderInitiated specifies if the link was created by the rider, for example the player starting to ride
+	// a horse by itself. This is generally true in vanilla environment for players.
+	RiderInitiated bool
 }
 
 // Marshal encodes/decodes a single entity link.
@@ -23,4 +26,5 @@ func (x *EntityLink) Marshal(r protocol.IO) {
 	r.Varint64(&x.RiderEntityUniqueID)
 	r.Uint8(&x.Type)
 	r.Bool(&x.Immediate)
+	r.Bool(&x.RiderInitiated)
 }

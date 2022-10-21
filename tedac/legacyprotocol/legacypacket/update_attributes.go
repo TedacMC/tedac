@@ -16,6 +16,8 @@ type UpdateAttributes struct {
 	// health, movement speed, etc. Note that only changed attributes have to be sent in this packet. It is
 	// not required to send attributes that did not have their values changed.
 	Attributes []legacyprotocol.Attribute
+	// Tick is the server tick at which the packet was sent. It is used in relation to CorrectPlayerMovePrediction.
+	Tick uint64
 }
 
 // ID ...
@@ -26,11 +28,13 @@ func (*UpdateAttributes) ID() uint32 {
 // Marshal ...
 func (pk *UpdateAttributes) Marshal(w *protocol.Writer) {
 	w.Varuint64(&pk.EntityRuntimeID)
-	protocol.Slice(w, &pk.Attributes)
+	legacyprotocol.WriteAttributes(w, &pk.Attributes)
+	w.Varuint64(&pk.Tick)
 }
 
 // Unmarshal ...
 func (pk *UpdateAttributes) Unmarshal(r *protocol.Reader) {
 	r.Varuint64(&pk.EntityRuntimeID)
-	protocol.Slice(r, &pk.Attributes)
+	legacyprotocol.Attributes(r, &pk.Attributes)
+	r.Varuint64(&pk.Tick)
 }

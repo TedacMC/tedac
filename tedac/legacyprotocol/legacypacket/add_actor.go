@@ -44,7 +44,7 @@ type AddActor struct {
 	// EntityLinks is a list of entity links that are currently active on the entity. These links alter the
 	// way the entity shows up when first spawned in terms of it shown as riding an entity. Setting these
 	// links is important for new viewers to see the entity is riding another entity.
-	EntityLinks []legacyprotocol.EntityLink
+	EntityLinks []protocol.EntityLink
 }
 
 // ID ...
@@ -62,7 +62,7 @@ func (pk *AddActor) Marshal(w *protocol.Writer) {
 	w.Float32(&pk.Pitch)
 	w.Float32(&pk.Yaw)
 	w.Float32(&pk.HeadYaw)
-	protocol.Slice(w, &pk.Attributes)
+	legacyprotocol.WriteInitialAttributes(w, &pk.Attributes)
 	w.EntityMetadata(&pk.EntityMetadata)
 	protocol.Slice(w, &pk.EntityLinks)
 }
@@ -77,7 +77,7 @@ func (pk *AddActor) Unmarshal(r *protocol.Reader) {
 	r.Float32(&pk.Pitch)
 	r.Float32(&pk.Yaw)
 	r.Float32(&pk.HeadYaw)
-	protocol.Slice(r, &pk.Attributes)
+	legacyprotocol.InitialAttributes(r, &pk.Attributes)
 	r.EntityMetadata(&pk.EntityMetadata)
 	protocol.Slice(r, &pk.EntityLinks)
 }

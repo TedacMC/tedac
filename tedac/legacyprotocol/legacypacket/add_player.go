@@ -70,10 +70,13 @@ type AddPlayer struct {
 	// EntityLinks is a list of entity links that are currently active on the player. These links alter the
 	// way the player shows up when first spawned in terms of it shown as riding an entity. Setting these
 	// links is important for new viewers to see the player is riding another entity.
-	EntityLinks []legacyprotocol.EntityLink
+	EntityLinks []protocol.EntityLink
 	// DeviceID is the device ID set in one of the files found in the storage of the device of the player. It
 	// may be changed freely, so it should not be relied on for anything.
 	DeviceID string
+	// BuildPlatform is the build platform/device OS of the player that is about to be added, as it sent in
+	// the Login packet when joining.
+	BuildPlatform int32
 }
 
 // ID ...
@@ -103,6 +106,7 @@ func (pk *AddPlayer) Marshal(w *protocol.Writer) {
 	w.Int64(&pk.PlayerUniqueID)
 	protocol.Slice(w, &pk.EntityLinks)
 	w.String(&pk.DeviceID)
+	w.Int32(&pk.BuildPlatform)
 }
 
 // Unmarshal ...
@@ -127,4 +131,5 @@ func (pk *AddPlayer) Unmarshal(r *protocol.Reader) {
 	r.Int64(&pk.PlayerUniqueID)
 	protocol.Slice(r, &pk.EntityLinks)
 	r.String(&pk.DeviceID)
+	r.Int32(&pk.BuildPlatform)
 }

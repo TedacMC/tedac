@@ -4,6 +4,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 )
 
 const (
@@ -37,21 +38,6 @@ type PlayerListEntry struct {
 	// Username is the username that is shown in the player list of the player that obtains a PlayerList
 	// packet with this entry. It does not have to be the same as the actual username of the player.
 	Username string
-	// SkinID is a unique ID produced for the skin, for example 'c18e65aa-7b21-4637-9b63-8ad63622ef01_Alex'
-	// for the default Alex skin.
-	SkinID string
-	// SkinData is a byte slice of 64*32*4, 64*64*4 or 128*128*4 bytes. It is a RGBA ordered byte
-	// representation of the skin colours.
-	SkinData []byte
-	// CapeData is a byte slice of 64*32*4 bytes. It is a RGBA ordered byte representation of the cape
-	// colours, much like the SkinData.
-	CapeData []byte
-	// SkinGeometryName is the geometry name of the skin geometry above. This name must be equal to one of the
-	// outer names found in the SkinGeometry, so that the client can find the correct geometry data.
-	SkinGeometryName string
-	// SkinGeometry is a base64 JSON encoded structure of the geometry data of a skin, containing properties
-	// such as bones, uv, pivot etc.
-	SkinGeometry []byte
 	// XUID is the XBOX Live user ID of the player, which will remain consistent as long as the player is
 	// logged in with the XBOX Live account.
 	XUID string
@@ -59,6 +45,16 @@ type PlayerListEntry struct {
 	// Nintendo Switch). It is otherwise an empty string, and is used to decide which players are able to
 	// chat with each other.
 	PlatformChatID string
+	// BuildPlatform is the platform of the player as sent by that player in the Login packet.
+	BuildPlatform int32
+	// Skin is the skin of the player that should be added to the player list. Once sent here, it will not
+	// have to be sent again.
+	Skin legacyprotocol.Skin
+	// Teacher is a Minecraft: Education Edition field. It specifies if the player to be added to the player
+	// list is a teacher.
+	Teacher bool
+	// Host specifies if the player that is added to the player list is the host of the game.
+	Host bool
 }
 
 // ID ...
@@ -68,8 +64,8 @@ func (*PlayerList) ID() uint32 {
 
 // Marshal ...
 func (pk *PlayerList) Marshal(w *protocol.Writer) {
-	w.Uint8(&pk.ActionType)
 	l := uint32(len(pk.Entries))
+	w.Uint8(&pk.ActionType)
 	w.Varuint32(&l)
 	for _, entry := range pk.Entries {
 		switch pk.ActionType {
@@ -77,64 +73,52 @@ func (pk *PlayerList) Marshal(w *protocol.Writer) {
 			w.UUID(&entry.UUID)
 			w.Varint64(&entry.EntityUniqueID)
 			w.String(&entry.Username)
-			w.String(&entry.SkinID)
-			w.ByteSlice(&entry.SkinData)
-			w.ByteSlice(&entry.CapeData)
-			w.String(&entry.SkinGeometryName)
-			w.ByteSlice(&entry.SkinGeometry)
 			w.String(&entry.XUID)
 			w.String(&entry.PlatformChatID)
+			w.Int32(&entry.BuildPlatform)
+			legacyprotocol.WriteSerialisedSkin(w, &entry.Skin)
+			w.Bool(&entry.Teacher)
+			w.Bool(&entry.Host)
 		case PlayerListActionRemove:
 			w.UUID(&entry.UUID)
 		default:
 			panic("unknown player list action type")
 		}
-
+	}
+	if pk.ActionType == PlayerListActionAdd {
+		for _, entry := range pk.Entries {
+			w.Bool(&entry.Skin.Trusted)
+		}
 	}
 }
 
 // Unmarshal ...
 func (pk *PlayerList) Unmarshal(r *protocol.Reader) {
-	var c uint32
+	var count uint32
 	r.Uint8(&pk.ActionType)
-	r.Varuint32(&c)
-	pk.Entries = make([]PlayerListEntry, c)
-	for i := uint32(0); i < c; i++ {
+	r.Varuint32(&count)
+	pk.Entries = make([]PlayerListEntry, count)
+	for i := uint32(0); i < count; i++ {
 		switch pk.ActionType {
 		case PlayerListActionAdd:
 			r.UUID(&pk.Entries[i].UUID)
 			r.Varint64(&pk.Entries[i].EntityUniqueID)
 			r.String(&pk.Entries[i].Username)
-			r.String(&pk.Entries[i].SkinID)
-			r.ByteSlice(&pk.Entries[i].SkinData)
-			r.ByteSlice(&pk.Entries[i].CapeData)
-			r.String(&pk.Entries[i].SkinGeometryName)
-			r.ByteSlice(&pk.Entries[i].SkinGeometry)
 			r.String(&pk.Entries[i].XUID)
 			r.String(&pk.Entries[i].PlatformChatID)
+			r.Int32(&pk.Entries[i].BuildPlatform)
+			legacyprotocol.SerialisedSkin(r, &pk.Entries[i].Skin)
+			r.Bool(&pk.Entries[i].Teacher)
+			r.Bool(&pk.Entries[i].Host)
 		case PlayerListActionRemove:
 			r.UUID(&pk.Entries[i].UUID)
 		default:
 			panic("unknown player list action type")
 		}
 	}
-}
-
-// Marshal encodes/decodes a PlayerListEntry.
-func (x *PlayerListEntry) Marshal(r protocol.IO) {
-	r.UUID(&x.UUID)
-	r.Varint64(&x.EntityUniqueID)
-	r.String(&x.Username)
-	r.String(&x.SkinID)
-	r.ByteSlice(&x.SkinData)
-	r.ByteSlice(&x.CapeData)
-	r.String(&x.SkinGeometryName)
-	r.ByteSlice(&x.SkinGeometry)
-	r.String(&x.XUID)
-	r.String(&x.PlatformChatID)
-}
-
-// PlayerListRemoveEntry encodes/decodes a PlayerListEntry for removal from the list.
-func PlayerListRemoveEntry(r protocol.IO, x *PlayerListEntry) {
-	r.UUID(&x.UUID)
+	if pk.ActionType == PlayerListActionAdd {
+		for i := uint32(0); i < count; i++ {
+			r.Bool(&pk.Entries[i].Skin.Trusted)
+		}
+	}
 }

@@ -3,6 +3,7 @@ package legacymappings
 import (
 	_ "embed"
 	"encoding/json"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/tedacmc/tedac/tedac/latestmappings"
 )
 
@@ -13,7 +14,7 @@ var (
 	blockStateMetaData []byte
 
 	// blocks holds a list of all existing v in the game.
-	blocks []BlockEntry
+	blocks []protocol.BlockEntry
 
 	// stateToRuntimeID maps a block state hash to a runtime ID.
 	stateToRuntimeID = map[latestmappings.StateHash]uint32{}
@@ -33,25 +34,24 @@ func init() {
 		panic(err)
 	}
 
-	for latestRID, meta := range blockStateMetas {
+	for latestRID, _ := range blockStateMetas {
 		name, properties, _ := latestmappings.RuntimeIDToState(uint32(latestRID))
 		if alias, ok := latestmappings.AliasFromUpdatedName(name); ok {
 			name = alias
 		}
 
-		legacyID, ok := legacyIDs[name]
+		_, ok := legacyIDs[name]
 		if !ok {
-			// This block didn't exist in v1.12.0.
+			// This block didn't exist in v1.16.100.
 			continue
 		}
 
 		state := latestmappings.State{Name: name, Properties: properties}
 		legacyRID := uint32(len(blocks))
 
-		blocks = append(blocks, BlockEntry{
-			Name:     name,
-			Data:     meta,
-			LegacyID: legacyID,
+		blocks = append(blocks, protocol.BlockEntry{
+			Name:       name,
+			Properties: properties,
 		})
 		stateToRuntimeID[latestmappings.HashState(state)] = legacyRID
 		runtimeIDToState[legacyRID] = state
@@ -77,6 +77,6 @@ func RuntimeIDToState(runtimeID uint32) (name string, properties map[string]any,
 }
 
 // Blocks returns a slice of all block entries.
-func Blocks() []BlockEntry {
+func Blocks() []protocol.BlockEntry {
 	return blocks
 }

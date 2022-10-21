@@ -15,7 +15,7 @@ function Home() {
     const [connectionButton, setConnectionButton] = useState(true);
     const [connectionLoader, setConnectionLoader] = useState("none");
 
-    const [address, setAddress] = useState("");
+    const [address, setAddress] = useState("127.0.0.1");
     const [port, setPort] = useState("19132");
 
     const [checkNetIsolation, setCheckNetIsolation] = useState(true)
@@ -47,7 +47,7 @@ function Home() {
                     Welcome to Tedac. 👋
                 </h1>
                 <p className="ml-12 mt-4 text-lg text-slate-600 max-w-3xl dark:text-slate-400">
-                    Tedac is a multi-version proxy that lets you join any Minecraft: Bedrock Edition server on v1.12.0,
+                    Tedac is a multi-version proxy that lets you join any Minecraft: Bedrock Edition server on v1.16.100,
                     no effort required.
                 </p>
             </div>
