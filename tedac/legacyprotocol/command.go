@@ -43,20 +43,19 @@ const (
 	CommandArgSuffixed = 0x1000000
 	CommandArgSoftEnum = 0x4000000
 
-	CommandArgTypeInt = iota + 1
-	CommandArgTypeFloat
-	CommandArgTypeValue
-	CommandArgTypeWildcardInt
-	CommandArgTypeOperator
-	CommandArgTypeTarget
-
-	CommandArgTypeFilepath = 0x0e
-	CommandArgTypeString   = 0x1b
-	CommandArgTypePosition = 0x1d
-	CommandArgTypeMessage  = 0x20
-	CommandArgTypeRawText  = 0x22
-	CommandArgTypeJSON     = 0x25
-	CommandArgTypeCommand  = 0x2c
+	CommandArgTypeInt         = 1
+	CommandArgTypeFloat       = 2
+	CommandArgTypeValue       = 3
+	CommandArgTypeWildcardInt = 4
+	CommandArgTypeOperator    = 5
+	CommandArgTypeTarget      = 6
+	CommandArgTypeFilepath    = 14
+	CommandArgTypeString      = 29
+	CommandArgTypePosition    = 37
+	CommandArgTypeMessage     = 41
+	CommandArgTypeRawText     = 43
+	CommandArgTypeJSON        = 46
+	CommandArgTypeCommand     = 53
 )
 
 // CommandParameter represents a single parameter of a command overload, which accepts a certain type of input
@@ -263,4 +262,39 @@ func CommandParam(r *protocol.Reader, x *CommandParameter, enums []CommandEnum, 
 		r.LimitUint32(offset, uint32(len(suffixes))-1)
 		x.Suffix = suffixes[offset]
 	}
+}
+
+// CommandEnumConstraint is sent in the AvailableCommands packet to limit what values of an enum may be used
+// taking in account things such as whether cheats are enabled.
+type CommandEnumConstraint struct {
+	// EnumOption is the option in an enum that the constraints should be applied to.
+	EnumOption string
+	// EnumName is the name of the enum of which the EnumOption above should be constrained.
+	EnumName string
+	// Constraints is a list of constraints that should be applied to the enum option. It is one of the values
+	// found above.
+	Constraints []byte
+}
+
+// WriteEnumConstraint writes a CommandEnumConstraint x to Writer w using the enum (value) indices passed.
+func WriteEnumConstraint(w *protocol.Writer, x *CommandEnumConstraint, enumIndices map[string]int, enumValueIndices map[string]int) {
+	enumValueIndex, enumIndex := uint32(enumValueIndices[x.EnumOption]), uint32(enumIndices[x.EnumName])
+	w.Uint32(&enumValueIndex)
+	w.Uint32(&enumIndex)
+	w.ByteSlice(&x.Constraints)
+}
+
+// EnumConstraint reads a CommandEnumConstraint x from Buffer src using the enums and enum values passed.
+func EnumConstraint(r *protocol.Reader, x *CommandEnumConstraint, enums []CommandEnum, enumValues []string) {
+	var enumValueIndex, enumIndex uint32
+	r.Uint32(&enumValueIndex)
+	r.Uint32(&enumIndex)
+
+	r.LimitUint32(enumValueIndex, uint32(len(enumValues))-1)
+	r.LimitUint32(enumIndex, uint32(len(enums))-1)
+
+	x.EnumOption = enumValues[enumValueIndex]
+	x.EnumName = enums[enumIndex].Type
+
+	r.ByteSlice(&x.Constraints)
 }

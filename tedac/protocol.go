@@ -3,6 +3,8 @@ package tedac
 import (
 	"bytes"
 	"fmt"
+	"image/color"
+
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/samber/lo"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -15,7 +17,6 @@ import (
 	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
 	_ "github.com/tedacmc/tedac/tedac/raknet"
-	"image/color"
 )
 
 // Protocol represents the v1.16.100 Protocol implementation.
@@ -364,12 +365,12 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 	case *packet.CreativeContent:
 		return []packet.Packet{
 			&legacypacket.CreativeContent{
-				Items: lo.Map(pk.Items, func(instance protocol.CreativeItem, _ int) legacyprotocol.CreativeItem {
-					return legacyprotocol.CreativeItem{
-						//CreativeItemNetworkID: instance.CreativeItemNetworkID,
-						Item: downgradeItem(instance.Item),
-					}
-				}),
+				// Items: lo.Map(pk.Items, func(instance protocol.CreativeItem, _ int) legacyprotocol.CreativeItem {
+				// 	return legacyprotocol.CreativeItem{
+				// 		CreativeItemNetworkID: instance.CreativeItemNetworkID,
+				// 		Item:                  downgradeItem(instance.Item),
+				// 	}
+				// }),
 			},
 		}
 	case *packet.Event:
@@ -537,6 +538,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 		}
 	case *packet.StartGame:
 		// TODO: Adjust our mappings to account for any possible custom blocks.
+		forceExpGame, _ := pk.ForceExperimentalGameplay.Value()
 		return []packet.Packet{
 			&legacypacket.StartGame{
 				EntityUniqueID:                 pk.EntityUniqueID,
@@ -570,7 +572,12 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				GameRules: lo.SliceToMap(pk.GameRules, func(rule protocol.GameRule) (string, any) {
 					return rule.Name, rule.Value
 				}),
-				Experiments:                     pk.Experiments,
+				Experiments: lo.Map(pk.Experiments, func(exp protocol.ExperimentData, _ int) legacyprotocol.ExperimentData {
+					return legacyprotocol.ExperimentData{
+						Name:    exp.Name,
+						Enabled: exp.Enabled,
+					}
+				}),
 				ExperimentsPreviouslyToggled:    pk.ExperimentsPreviouslyToggled,
 				BonusChestEnabled:               pk.BonusChestEnabled,
 				StartWithMapEnabled:             pk.StartWithMapEnabled,
@@ -587,7 +594,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				LimitedWorldWidth:               pk.LimitedWorldWidth,
 				LimitedWorldDepth:               pk.LimitedWorldDepth,
 				NewNether:                       pk.NewNether,
-				ForceExperimentalGameplay:       pk.ForceExperimentalGameplay,
+				ForceExperimentalGameplay:       forceExpGame,
 				LevelID:                         pk.LevelID,
 				WorldName:                       pk.WorldName,
 				TemplateContentIdentity:         pk.TemplateContentIdentity,

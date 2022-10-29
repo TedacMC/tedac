@@ -2,12 +2,13 @@ package legacyprotocol
 
 import (
 	"fmt"
+
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
 // GameRules reads a map of game rules from Reader r. It sets one of the types 'bool', 'float32' or 'uint32'
 // to the map x, with the key being the name of the game rule.
-func GameRules(r *protocol.Reader, x *map[string]any) {
+func GameRules(r *protocol.Reader, x *map[string]interface{}) {
 	var count uint32
 	r.Varuint32(&count)
 	r.LimitUint32(count, mediumLimit)
@@ -42,7 +43,7 @@ func GameRules(r *protocol.Reader, x *map[string]any) {
 // WriteGameRules writes a map of game rules x, indexed by their names to Writer w. The types of the map
 // values must be either 'bool', 'float32' or 'uint32'. If one of the values has a different type, the
 // function will panic.
-func WriteGameRules(w *protocol.Writer, x *map[string]any) {
+func WriteGameRules(w *protocol.Writer, x *map[string]interface{}) {
 	l := uint32(len(*x))
 	w.Varuint32(&l)
 	for name, value := range *x {

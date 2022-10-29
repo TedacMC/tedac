@@ -2,6 +2,7 @@ package legacypacket
 
 import (
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/sandertv/gophertunnel/minecraft/nbt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/tedacmc/tedac/tedac/legacyprotocol"
@@ -101,12 +102,8 @@ type StartGame struct {
 	// GameRules defines game rules currently active with their respective values. The value of these game
 	// rules may be either 'bool', 'int32' or 'float32'. Some game rules are server side only, and don't
 	// necessarily need to be sent to the client.
-	GameRules map[string]any
-	// Experiments holds a list of experiments that are either enabled or disabled in the world that the
-	// player spawns in.
-	Experiments []protocol.ExperimentData
-	// ExperimentsPreviouslyToggled specifies if any experiments were previously toggled in this world. It is
-	// probably used for some kind of metrics.
+	GameRules                    map[string]interface{}
+	Experiments                  []legacyprotocol.ExperimentData
 	ExperimentsPreviouslyToggled bool
 	// BonusChestEnabled specifies if the world had the bonus map setting enabled when generating it. It does
 	// not have any effect client-side.
@@ -154,7 +151,7 @@ type StartGame struct {
 	NewNether bool
 	// ForceExperimentalGameplay specifies if experimental gameplay should be force enabled. For servers this
 	// should always be set to false.
-	ForceExperimentalGameplay protocol.Optional[bool]
+	ForceExperimentalGameplay bool
 	// LevelID is a base64 encoded world ID that is used to identify the world.
 	LevelID string
 	// WorldName is the name of the world that the player is joining. Note that this field shows up above the
@@ -180,7 +177,7 @@ type StartGame struct {
 	// table. Note that the exact correct random implementation must be used to produce the correct results
 	// both client- and server-side.
 	EnchantmentSeed int32
-	// Blocks is a list of all custom blocks registered on the server.
+	// Blocks is a list of all blocks registered on the server.
 	Blocks []protocol.BlockEntry
 	// Items is a list of all items with their legacy IDs which are available in the game. Failing to send any
 	// of the items that are in the game will crash mobile clients.
@@ -230,7 +227,7 @@ func (pk *StartGame) Marshal(w *protocol.Writer) {
 	w.Bool(&pk.CommandsEnabled)
 	w.Bool(&pk.TexturePackRequired)
 	legacyprotocol.WriteGameRules(w, &pk.GameRules)
-	protocol.SliceUint32Length(w, &pk.Experiments)
+	legacyprotocol.Experiments(w, &pk.Experiments)
 	w.Bool(&pk.ExperimentsPreviouslyToggled)
 	w.Bool(&pk.BonusChestEnabled)
 	w.Bool(&pk.StartWithMapEnabled)
@@ -247,7 +244,12 @@ func (pk *StartGame) Marshal(w *protocol.Writer) {
 	w.Int32(&pk.LimitedWorldWidth)
 	w.Int32(&pk.LimitedWorldDepth)
 	w.Bool(&pk.NewNether)
-	protocol.OptionalFunc(w, &pk.ForceExperimentalGameplay, w.Bool)
+	w.Bool(&pk.ForceExperimentalGameplay)
+	if pk.ForceExperimentalGameplay {
+		// This might look wrong, but is in fact correct: Mojang is writing this bool if the same bool above
+		// is set to true.
+		w.Bool(&pk.ForceExperimentalGameplay)
+	}
 	w.String(&pk.LevelID)
 	w.String(&pk.WorldName)
 	w.String(&pk.TemplateContentIdentity)
@@ -255,15 +257,29 @@ func (pk *StartGame) Marshal(w *protocol.Writer) {
 	w.Varuint32(&pk.ServerAuthoritativeMovementMode)
 	w.Int64(&pk.Time)
 	w.Varint32(&pk.EnchantmentSeed)
-	protocol.Slice(w, &pk.Blocks)
-	protocol.Slice(w, &pk.Items)
+
+	l := uint32(len(pk.Blocks))
+	w.Varuint32(&l)
+	for i := range pk.Blocks {
+		w.String(&pk.Blocks[i].Name)
+		w.NBT(&pk.Blocks[i].Properties, nbt.NetworkLittleEndian)
+	}
+
+	l = uint32(len(pk.Items))
+	w.Varuint32(&l)
+	for i := range pk.Items {
+		w.String(&pk.Items[i].Name)
+		w.Int16(&pk.Items[i].RuntimeID)
+		w.Bool(&pk.Items[i].ComponentBased)
+	}
 	w.String(&pk.MultiPlayerCorrelationID)
 	w.Bool(&pk.ServerAuthoritativeInventory)
 }
 
 // Unmarshal ...
 func (pk *StartGame) Unmarshal(r *protocol.Reader) {
-	pk.GameRules = make(map[string]any)
+	pk.GameRules = make(map[string]interface{})
+	var blockCount, itemCount uint32
 	r.Varint64(&pk.EntityUniqueID)
 	r.Varuint64(&pk.EntityRuntimeID)
 	r.Varint32(&pk.PlayerGameMode)
@@ -293,7 +309,7 @@ func (pk *StartGame) Unmarshal(r *protocol.Reader) {
 	r.Bool(&pk.CommandsEnabled)
 	r.Bool(&pk.TexturePackRequired)
 	legacyprotocol.GameRules(r, &pk.GameRules)
-	protocol.SliceUint32Length(r, &pk.Experiments)
+	legacyprotocol.Experiments(r, &pk.Experiments)
 	r.Bool(&pk.ExperimentsPreviouslyToggled)
 	r.Bool(&pk.BonusChestEnabled)
 	r.Bool(&pk.StartWithMapEnabled)
@@ -310,7 +326,12 @@ func (pk *StartGame) Unmarshal(r *protocol.Reader) {
 	r.Int32(&pk.LimitedWorldWidth)
 	r.Int32(&pk.LimitedWorldDepth)
 	r.Bool(&pk.NewNether)
-	protocol.OptionalFunc(r, &pk.ForceExperimentalGameplay, r.Bool)
+	r.Bool(&pk.ForceExperimentalGameplay)
+	if pk.ForceExperimentalGameplay {
+		// This might look wrong, but is in fact correct: Mojang is writing this bool if the same bool above
+		// is set to true.
+		r.Bool(&pk.ForceExperimentalGameplay)
+	}
 	r.String(&pk.LevelID)
 	r.String(&pk.WorldName)
 	r.String(&pk.TemplateContentIdentity)
@@ -318,8 +339,21 @@ func (pk *StartGame) Unmarshal(r *protocol.Reader) {
 	r.Varuint32(&pk.ServerAuthoritativeMovementMode)
 	r.Int64(&pk.Time)
 	r.Varint32(&pk.EnchantmentSeed)
-	protocol.Slice(r, &pk.Blocks)
-	protocol.Slice(r, &pk.Items)
+
+	r.Varuint32(&blockCount)
+	pk.Blocks = make([]protocol.BlockEntry, blockCount)
+	for i := uint32(0); i < blockCount; i++ {
+		r.String(&pk.Blocks[i].Name)
+		r.NBT(&pk.Blocks[i].Properties, nbt.NetworkLittleEndian)
+	}
+
+	r.Varuint32(&itemCount)
+	pk.Items = make([]protocol.ItemEntry, itemCount)
+	for i := uint32(0); i < itemCount; i++ {
+		r.String(&pk.Items[i].Name)
+		r.Int16(&pk.Items[i].RuntimeID)
+		r.Bool(&pk.Items[i].ComponentBased)
+	}
 	r.String(&pk.MultiPlayerCorrelationID)
 	r.Bool(&pk.ServerAuthoritativeInventory)
 }

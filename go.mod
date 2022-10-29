@@ -3,7 +3,6 @@ module github.com/tedacmc/tedac
 go 1.18
 
 require (
-	github.com/df-mc/atomic v1.10.0
 	github.com/df-mc/dragonfly v0.8.5
 	github.com/go-gl/mathgl v1.0.0
 	github.com/google/uuid v1.3.0
@@ -20,6 +19,7 @@ require (
 require (
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/brentp/intintmap v0.0.0-20190211203843-30dc0ade9af9 // indirect
+	github.com/df-mc/atomic v1.10.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
@@ -57,4 +57,4 @@ require (
 
 replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.4
 
-replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v0.0.18
+replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v0.0.20

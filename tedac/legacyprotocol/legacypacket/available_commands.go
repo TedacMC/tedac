@@ -15,6 +15,9 @@ type AvailableCommands struct {
 	// Commands is a list of all commands that the client should show client-side. The AvailableCommands
 	// packet replaces any commands sent before. It does not only add the commands that are sent in it.
 	Commands []legacyprotocol.Command
+	// Constraints is a list of constraints that should be applied to certain options of enums in the commands
+	// above.
+	Constraints []legacyprotocol.CommandEnumConstraint
 }
 
 // ID ...
@@ -66,11 +69,11 @@ func (pk *AvailableCommands) Marshal(w *protocol.Writer) {
 
 	// Constraints are supposed to be here, but constraints are pointless, make no sense to be in this packet
 	// and are not worth implementing.
-	// constraintsLen := uint32(len(pk.Constraints))
-	// w.Varuint32(&constraintsLen)
-	// for _, constraint := range pk.Constraints {
-	// 	protocol.WriteEnumConstraint(w, &constraint, enumIndices, valueIndices)
-	// }
+	constraintsLen := uint32(len(pk.Constraints))
+	w.Varuint32(&constraintsLen)
+	for _, constraint := range pk.Constraints {
+		legacyprotocol.WriteEnumConstraint(w, &constraint, enumIndices, valueIndices)
+	}
 }
 
 // Unmarshal ...
@@ -132,11 +135,11 @@ func (pk *AvailableCommands) Unmarshal(r *protocol.Reader) {
 		}
 	}
 
-	// r.Varuint32(&count)
-	// pk.Constraints = make([]protocol.CommandEnumConstraint, count)
-	// for i := uint32(0); i < count; i++ {
-	// 	protocol.EnumConstraint(r, &pk.Constraints[i], enums, enumValues)
-	// }
+	r.Varuint32(&count)
+	pk.Constraints = make([]legacyprotocol.CommandEnumConstraint, count)
+	for i := uint32(0); i < count; i++ {
+		legacyprotocol.EnumConstraint(r, &pk.Constraints[i], enums, enumValues)
+	}
 }
 
 // writeEnumOption writes an enum option to w using the value indices passed. It is written as a
