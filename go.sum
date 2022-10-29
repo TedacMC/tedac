@@ -102,8 +102,8 @@ github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UV
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.7.1 h1:5TQK59W5E3v0r2duFAb7P95B6hEeOyEnHRa8MjYSMTY=
 github.com/syossan27/tebata v0.0.0-20180602121909-b283fe4bc5ba/go.mod h1:iLnlXG2Pakcii2CU0cbY07DRCSvpWNa7nFxtevhOChk=
-github.com/tedacmc/tedac-gophertunnel v0.0.18 h1:EyZM9v4s4MBzB52vlU2VSPaVsLq+hqJb/aae1dcaGEM=
-github.com/tedacmc/tedac-gophertunnel v0.0.18/go.mod h1:ajY+W3QYBF8//FLOxVbMV5GUK9ubdKFJ1pVMwYL/t7k=
+github.com/tedacmc/tedac-gophertunnel v0.0.20 h1:Un0a57gGEtk1aHCXhBfg9kFv8srknHNeCqPUYew5k4A=
+github.com/tedacmc/tedac-gophertunnel v0.0.20/go.mod h1:ajY+W3QYBF8//FLOxVbMV5GUK9ubdKFJ1pVMwYL/t7k=
 github.com/tedacmc/tedac-raknet v0.0.4 h1:GcRfp38iXARo/Wb+nfrCPHrYpqgAGi7XzapwunIA/LQ=
 github.com/tedacmc/tedac-raknet v0.0.4/go.mod h1:vT0+qrD5NHYW9OElUncfIRT0brTgJhxyaozMZyjL2Zc=
 github.com/thoas/go-funk v0.9.1 h1:O549iLZqPpTUQ10ykd26sZhzD+rmR5pWhuElrhbC20M=
