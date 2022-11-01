@@ -163,19 +163,15 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 	var g sync.WaitGroup
 	g.Add(2)
 	go func() {
-		fmt.Println("Starting game")
 		if err := conn.StartGame(data); err != nil {
 			panic(err)
 		}
-		fmt.Println("Started game")
 		g.Done()
 	}()
 	go func() {
-		fmt.Println("Spawning")
 		if err := serverConn.DoSpawn(); err != nil {
 			panic(err)
 		}
-		fmt.Println("Spawned")
 		g.Done()
 	}()
 	g.Wait()

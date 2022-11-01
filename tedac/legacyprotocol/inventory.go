@@ -39,10 +39,14 @@ type InventoryAction struct {
 	// NewItem is the new item that was put in the InventorySlot that the OldItem was in. It must be checked
 	// in combination with other inventory actions to ensure that the transaction is balanced.
 	NewItem ItemStack
+	// StackNetworkID is the unique network ID of the new stack. This is always 0 when an InventoryTransaction
+	// packet is sent by the client. It is also always 0 when the HasNetworkIDs field in the
+	// InventoryTransaction packet is set to false.
+	StackNetworkID int32
 }
 
 // Marshal encodes an InventoryAction.
-func (x *InventoryAction) Marshal(w *protocol.Writer) {
+func (x *InventoryAction) Marshal(w *protocol.Writer, netIDs bool) {
 	w.Varuint32(&x.SourceType)
 	switch x.SourceType {
 	case InventoryActionSourceContainer, InventoryActionSourceTODO:
@@ -53,10 +57,13 @@ func (x *InventoryAction) Marshal(w *protocol.Writer) {
 	w.Varuint32(&x.InventorySlot)
 	WriteItem(w, &x.OldItem)
 	WriteItem(w, &x.NewItem)
+	if netIDs {
+		w.Varint32(&x.StackNetworkID)
+	}
 }
 
 // Unmarshal decodes an InventoryAction.
-func (x *InventoryAction) Unmarshal(r *protocol.Reader) {
+func (x *InventoryAction) Unmarshal(r *protocol.Reader, netIDs bool) {
 	r.Varuint32(&x.SourceType)
 	switch x.SourceType {
 	case InventoryActionSourceContainer, InventoryActionSourceTODO:
@@ -67,6 +74,9 @@ func (x *InventoryAction) Unmarshal(r *protocol.Reader) {
 	r.Varuint32(&x.InventorySlot)
 	Item(r, &x.OldItem)
 	Item(r, &x.NewItem)
+	if netIDs {
+		r.Varint32(&x.StackNetworkID)
+	}
 }
 
 // InventoryTransactionData represents an object that holds data specific to an inventory transaction type.

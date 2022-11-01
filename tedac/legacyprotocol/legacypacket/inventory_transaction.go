@@ -19,6 +19,20 @@ const (
 // directly relate to the inventory, others relate to interaction with the world, that could potentially
 // result in a change in the inventory.
 type InventoryTransaction struct {
+	// LegacyRequestID is an ID that is only non-zero at times when sent by the client. The server should
+	// always send 0 for this. When this field is not 0, the LegacySetItemSlots slice below will have values
+	// in it.
+	// LegacyRequestID ties in with the ItemStackResponse packet. If this field is non-0, the server should
+	// respond with an ItemStackResponse packet. Some inventory actions such as dropping an item out of the
+	// hotbar are still one using this packet, and the ItemStackResponse packet needs to tie in with it.
+	LegacyRequestID int32
+	// LegacySetItemSlots are only present if the LegacyRequestID is non-zero. These item slots inform the
+	// server of the slots that were changed during the inventory transaction, and the server should send
+	// back an ItemStackResponse packet with these slots present in it. (Or false with no slots, if rejected.)
+	LegacySetItemSlots []protocol.LegacySetItemSlot
+	// HasNetworkIDs specifies if the inventory actions below have network IDs associated with them. It is
+	// always set to false when a client sends this packet to the server.
+	HasNetworkIDs bool
 	// Actions is a list of actions that took place, that form the inventory transaction together. Each of
 	// these actions hold one slot in which one item was changed to another. In general, the combination of
 	// all of these actions results in a balanced inventory transaction. This should be checked to ensure that
@@ -38,6 +52,12 @@ func (*InventoryTransaction) ID() uint32 {
 
 // Marshal ...
 func (pk *InventoryTransaction) Marshal(w *protocol.Writer) {
+	w.Varint32(&pk.LegacyRequestID)
+	if pk.LegacyRequestID != 0 {
+		protocol.FuncSlice(w, &pk.LegacySetItemSlots, func(slot *protocol.LegacySetItemSlot) {
+			slot.Marshal(w)
+		})
+	}
 	var id uint32
 	switch pk.TransactionData.(type) {
 	case nil, *legacyprotocol.NormalTransactionData:
@@ -52,8 +72,9 @@ func (pk *InventoryTransaction) Marshal(w *protocol.Writer) {
 		id = InventoryTransactionTypeReleaseItem
 	}
 	w.Varuint32(&id)
+	w.Bool(&pk.HasNetworkIDs)
 	protocol.FuncSlice(w, &pk.Actions, func(action *legacyprotocol.InventoryAction) {
-		action.Marshal(w)
+		action.Marshal(w, pk.HasNetworkIDs)
 	})
 	if pk.TransactionData != nil {
 		pk.TransactionData.Marshal(w)
@@ -62,11 +83,23 @@ func (pk *InventoryTransaction) Marshal(w *protocol.Writer) {
 
 // Unmarshal ...
 func (pk *InventoryTransaction) Unmarshal(r *protocol.Reader) {
-	var transactionType uint32
+	var length, transactionType uint32
+	r.Varint32(&pk.LegacyRequestID)
+	if pk.LegacyRequestID != 0 {
+		protocol.FuncSlice(r, &pk.LegacySetItemSlots, func(slot *protocol.LegacySetItemSlot) {
+			slot.Marshal(r)
+		})
+	}
 	r.Varuint32(&transactionType)
-	protocol.FuncSlice(r, &pk.Actions, func(action *legacyprotocol.InventoryAction) {
-		action.Unmarshal(r)
-	})
+	r.Bool(&pk.HasNetworkIDs)
+	r.Varuint32(&length)
+	r.LimitUint32(length, 512)
+	pk.Actions = make([]legacyprotocol.InventoryAction, length)
+	for i := uint32(0); i < length; i++ {
+		// Each InventoryTransaction packet has a list of actions at the start, with a transaction data object
+		// after that, depending on the transaction type.
+		pk.Actions[i].Unmarshal(r, pk.HasNetworkIDs)
+	}
 	switch transactionType {
 	case InventoryTransactionTypeNormal:
 		pk.TransactionData = &legacyprotocol.NormalTransactionData{}

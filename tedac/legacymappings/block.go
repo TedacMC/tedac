@@ -1,17 +1,16 @@
 package legacymappings
 
 import (
+	"bytes"
 	_ "embed"
-	"encoding/json"
+	"github.com/sandertv/gophertunnel/minecraft/nbt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/tedacmc/tedac/tedac/latestmappings"
 )
 
 var (
-	//go:embed block_id_map.json
-	blockIDData []byte
-	//go:embed block_state_meta_map.json
-	blockStateMetaData []byte
+	//go:embed block_states.nbt
+	blockStateData []byte
 
 	// blocks holds a list of all existing v in the game.
 	blocks []protocol.BlockEntry
@@ -24,37 +23,23 @@ var (
 
 // init reads all block entries from the resource JSON, and sets the according values in the maps.
 func init() {
-	var legacyIDs map[string]int16
-	if err := json.Unmarshal(blockIDData, &legacyIDs); err != nil {
-		panic(err)
-	}
+	dec := nbt.NewDecoder(bytes.NewBuffer(blockStateData))
 
-	var blockStateMetas []int16
-	if err := json.Unmarshal(blockStateMetaData, &blockStateMetas); err != nil {
-		panic(err)
-	}
-
-	for latestRID, _ := range blockStateMetas {
-		name, properties, _ := latestmappings.RuntimeIDToState(uint32(latestRID))
-		if alias, ok := latestmappings.AliasFromUpdatedName(name); ok {
-			name = alias
+	// Register all block states present in the block_states.nbt file. These are all possible options registered
+	// blocks may encode to.
+	var s latestmappings.State
+	for {
+		if err := dec.Decode(&s); err != nil {
+			break
 		}
 
-		_, ok := legacyIDs[name]
-		if !ok {
-			// This block didn't exist in v1.16.100.
-			continue
-		}
-
-		state := latestmappings.State{Name: name, Properties: properties}
-		legacyRID := uint32(len(blocks))
-
+		rid := uint32(len(blocks))
 		blocks = append(blocks, protocol.BlockEntry{
-			Name:       name,
-			Properties: properties,
+			Name:       s.Name,
+			Properties: s.Properties,
 		})
-		stateToRuntimeID[latestmappings.HashState(state)] = legacyRID
-		runtimeIDToState[legacyRID] = state
+		stateToRuntimeID[latestmappings.HashState(s)] = rid
+		runtimeIDToState[rid] = s
 	}
 }
 

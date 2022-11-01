@@ -15,7 +15,7 @@ function Home() {
     const [connectionButton, setConnectionButton] = useState(true);
     const [connectionLoader, setConnectionLoader] = useState("none");
 
-    const [address, setAddress] = useState("127.0.0.1");
+    const [address, setAddress] = useState("");
     const [port, setPort] = useState("19132");
 
     const [checkNetIsolation, setCheckNetIsolation] = useState(true)
