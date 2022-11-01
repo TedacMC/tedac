@@ -8,6 +8,7 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/samber/lo"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/nbt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/tedacmc/tedac/tedac/chunk"
@@ -50,10 +51,13 @@ func (Protocol) Packets() packet.Pool {
 	pool[packet.IDMobArmourEquipment] = func() packet.Packet { return &legacypacket.MobArmourEquipment{} }
 	pool[packet.IDMobEquipment] = func() packet.Packet { return &legacypacket.MobEquipment{} }
 	pool[packet.IDModalFormResponse] = func() packet.Packet { return &legacypacket.ModalFormResponse{} }
+	pool[packet.IDNPCRequest] = func() packet.Packet { return &legacypacket.NPCRequest{} }
 	pool[packet.IDPlayerAction] = func() packet.Packet { return &legacypacket.PlayerAction{} }
 	pool[packet.IDPlayerAuthInput] = func() packet.Packet { return &legacypacket.PlayerAuthInput{} }
 	pool[packet.IDPlayerSkin] = func() packet.Packet { return &legacypacket.PlayerSkin{} }
 	pool[packet.IDSetActorData] = func() packet.Packet { return &legacypacket.SetActorData{} }
+	pool[packet.IDStructureBlockUpdate] = func() packet.Packet { return &legacypacket.StructureBlockUpdate{} }
+	pool[packet.IDStructureTemplateDataRequest] = func() packet.Packet { return &legacypacket.StructureTemplateDataRequest{} }
 
 	return pool
 }
@@ -187,15 +191,28 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				CancelReason: cancelReason,
 			},
 		}
+	case *legacypacket.NPCRequest:
+		return []packet.Packet{&packet.NPCRequest{
+			EntityRuntimeID: pk.EntityRuntimeID,
+			RequestType:     pk.RequestType,
+			CommandString:   pk.CommandString,
+			ActionType:      pk.ActionType,
+			SceneName:       "",
+		}}
 	case *legacypacket.PlayerAction:
-		return []packet.Packet{
-			&packet.PlayerAction{
-				EntityRuntimeID: pk.EntityRuntimeID,
-				ActionType:      pk.ActionType,
-				BlockPosition:   pk.BlockPosition,
-				BlockFace:       pk.BlockFace,
-			},
+		// TODO: Make this not horrible
+		if pk.ActionType == protocol.PlayerActionRespawn || pk.ActionType == protocol.PlayerActionDimensionChangeDone || pk.ActionType == protocol.PlayerActionStartBreak || pk.ActionType == protocol.PlayerActionContinueDestroyBlock || pk.ActionType == protocol.PlayerActionAbortBreak || pk.ActionType == protocol.PlayerActionPredictDestroyBlock || pk.ActionType == protocol.PlayerActionStopBreak || pk.ActionType == protocol.PlayerActionCrackBreak || pk.ActionType == protocol.PlayerActionStartItemUseOn || pk.ActionType == protocol.PlayerActionStopItemUseOn || pk.ActionType == protocol.PlayerActionStartBuildingBlock || pk.ActionType == legacypacket.PlayerActionCreativePlayerDestroyBlock {
+			return []packet.Packet{
+				&packet.PlayerAction{
+					EntityRuntimeID: pk.EntityRuntimeID,
+					ActionType:      pk.ActionType,
+					BlockPosition:   pk.BlockPosition,
+					BlockFace:       pk.BlockFace,
+				},
+			}
 		}
+		return nil
+
 	case *legacypacket.PlayerAuthInput:
 		return []packet.Packet{
 			&packet.PlayerAuthInput{
@@ -230,6 +247,49 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				Tick:            pk.Tick,
 			},
 		}
+	case *legacypacket.StructureBlockUpdate:
+		return []packet.Packet{&packet.StructureBlockUpdate{
+			Position:           pk.Position,
+			StructureName:      pk.StructureName,
+			DataField:          pk.DataField,
+			IncludePlayers:     pk.IncludePlayers,
+			ShowBoundingBox:    pk.ShowBoundingBox,
+			StructureBlockType: pk.StructureBlockType,
+			Settings: protocol.StructureSettings{
+				PaletteName:               pk.Settings.PaletteName,
+				IgnoreEntities:            pk.Settings.IgnoreEntities,
+				IgnoreBlocks:              pk.Settings.IgnoreBlocks,
+				AllowNonTickingChunks:     false,
+				Size:                      pk.Settings.Size,
+				Offset:                    pk.Settings.Offset,
+				LastEditingPlayerUniqueID: pk.Settings.LastEditingPlayerUniqueID,
+				Rotation:                  pk.Settings.Rotation,
+				Mirror:                    pk.Settings.Mirror,
+				Integrity:                 pk.Settings.Integrity,
+				Seed:                      pk.Settings.Seed,
+				Pivot:                     pk.Settings.Pivot,
+			},
+		}}
+	case *legacypacket.StructureTemplateDataRequest:
+		return []packet.Packet{&packet.StructureTemplateDataRequest{
+			StructureName: pk.StructureName,
+			Position:      pk.Position,
+			Settings: protocol.StructureSettings{
+				PaletteName:               pk.Settings.PaletteName,
+				IgnoreEntities:            pk.Settings.IgnoreEntities,
+				IgnoreBlocks:              pk.Settings.IgnoreBlocks,
+				AllowNonTickingChunks:     false,
+				Size:                      pk.Settings.Size,
+				Offset:                    pk.Settings.Offset,
+				LastEditingPlayerUniqueID: pk.Settings.LastEditingPlayerUniqueID,
+				Rotation:                  pk.Settings.Rotation,
+				Mirror:                    pk.Settings.Mirror,
+				Integrity:                 pk.Settings.Integrity,
+				Seed:                      pk.Settings.Seed,
+				Pivot:                     pk.Settings.Pivot,
+			},
+			RequestType: pk.RequestType,
+		}}
 	case *packet.AdventureSettings:
 	case *packet.TickSync:
 		return nil
@@ -341,6 +401,11 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				}),
 			},
 		}
+	case *packet.CameraShake:
+		return []packet.Packet{&legacypacket.CameraShake{
+			Intensity: pk.Intensity,
+			Duration:  pk.Intensity,
+		}}
 	case *packet.ClientBoundMapItemData:
 		pixels := make([][]color.RGBA, pk.Height)
 		pixels = append(pixels, pk.Pixels)
@@ -400,6 +465,15 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				}),
 			},
 		}
+	case *packet.EducationSettings:
+		oui, _ := pk.OverrideURI.Value()
+		return []packet.Packet{&legacypacket.EducationSettings{
+			CodeBuilderDefaultURI: pk.CodeBuilderDefaultURI,
+			CodeBuilderTitle:      pk.CodeBuilderTitle,
+			CanResizeCodeBuilder:  pk.CanResizeCodeBuilder,
+			OverrideURI:           oui,
+			HasQuiz:               pk.HasQuiz,
+		}}
 	case *packet.Event:
 		return []packet.Packet{
 			&legacypacket.Event{
@@ -544,6 +618,12 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				CompressionThreshold: pk.CompressionThreshold,
 			},
 		}
+	case *packet.PhotoTransfer:
+		return []packet.Packet{&legacypacket.PhotoTransfer{
+			PhotoName: pk.PhotoName,
+			PhotoData: pk.PhotoData,
+			BookID:    pk.BookID,
+		}}
 	case *packet.PlayerList:
 		return []packet.Packet{
 			&legacypacket.PlayerList{
@@ -572,6 +652,13 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				OldSkinName: pk.OldSkinName,
 			},
 		}
+	case *packet.PositionTrackingDBServerBroadcast:
+		data, _ := nbt.Marshal(&pk.Payload)
+		return []packet.Packet{&legacypacket.PositionTrackingDBServerBroadcast{
+			BroadcastAction: pk.BroadcastAction,
+			TrackingID:      pk.TrackingID,
+			SerialisedData:  data,
+		}}
 	case *packet.ResourcePacksInfo:
 		return []packet.Packet{
 			&legacypacket.ResourcePacksInfo{
