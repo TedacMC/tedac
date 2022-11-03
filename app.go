@@ -161,6 +161,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 	if _, ok := conn.Protocol().(tedac.Protocol); ok { // TODO: Adjust this inside Protocol itself.
 		clientData.GameVersion = protocol.CurrentVersion
 		clientData.SkinResourcePatch = defaultSkinResourcePatch
+		clientData.DeviceModel = "TEDAC CLIENT"
 
 		data, _ := base64.StdEncoding.DecodeString(clientData.SkinData)
 		switch len(data) {
