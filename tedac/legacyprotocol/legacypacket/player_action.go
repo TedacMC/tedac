@@ -32,10 +32,6 @@ const (
 	PlayerActionStartSpinAttack
 	PlayerActionStopSpinAttack
 	PlayerActionStartBuildingBlock
-	PlayerActionPredictDestroyBlock
-	PlayerActionContinueDestroyBlock
-	PlayerActionStartItemUseOn
-	PlayerActionStopItemUseOn
 )
 
 // PlayerAction is sent by the client when it executes any action, for example starting to sprint, swim,

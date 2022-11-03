@@ -17,7 +17,7 @@ type EducationSettings struct {
 	// builder when it is opened.
 	CanResizeCodeBuilder bool
 	// OverrideURI ...
-	OverrideURI string
+	OverrideURI protocol.Optional[string]
 	// HasQuiz specifies if the world has a quiz connected to it.
 	HasQuiz bool
 }
@@ -29,26 +29,18 @@ func (*EducationSettings) ID() uint32 {
 
 // Marshal ...
 func (pk *EducationSettings) Marshal(w *protocol.Writer) {
-	hasOverrideURI := pk.OverrideURI != ""
 	w.String(&pk.CodeBuilderDefaultURI)
 	w.String(&pk.CodeBuilderTitle)
 	w.Bool(&pk.CanResizeCodeBuilder)
-	w.Bool(&hasOverrideURI)
-	if hasOverrideURI {
-		w.String(&pk.OverrideURI)
-	}
+	protocol.OptionalFunc(w, &pk.OverrideURI, w.String)
 	w.Bool(&pk.HasQuiz)
 }
 
 // Unmarshal ...
 func (pk *EducationSettings) Unmarshal(r *protocol.Reader) {
-	var hasOverrideURI bool
 	r.String(&pk.CodeBuilderDefaultURI)
 	r.String(&pk.CodeBuilderTitle)
 	r.Bool(&pk.CanResizeCodeBuilder)
-	r.Bool(&hasOverrideURI)
-	if hasOverrideURI {
-		r.String(&pk.OverrideURI)
-	}
+	protocol.OptionalFunc(r, &pk.OverrideURI, r.String)
 	r.Bool(&pk.HasQuiz)
 }
