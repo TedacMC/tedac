@@ -7,11 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/sandertv/gophertunnel/minecraft/resource"
 	"github.com/tedacmc/tedac/tedac"
 	"github.com/tedacmc/tedac/tedac/chunk"
 	"github.com/tedacmc/tedac/tedac/latestmappings"
@@ -88,14 +90,49 @@ func (a *App) Connect(address string) error {
 		return err
 	}
 
+	err = os.Mkdir("packcache", 0644)
+	useCache := err == nil || os.IsExist(err)
+
+	var cachedPackNames []string
 	conn, err := minecraft.Dialer{
 		TokenSource: a.src,
+		DownloadResourcePack: func(id uuid.UUID, version string) bool {
+			if useCache {
+				name := fmt.Sprintf("%s_%s", id, version)
+				_, err = os.Stat(fmt.Sprintf("packcache/%s.mcpack", name))
+				if err == nil {
+					cachedPackNames = append(cachedPackNames, name)
+					return false
+				}
+			}
+			return true
+		},
 	}.Dial("raknet", address)
 	if err != nil {
 		return err
 	}
 	packs := conn.ResourcePacks()
 	_ = conn.Close()
+
+	var cachedPacks []*resource.Pack
+	if useCache {
+		for _, name := range cachedPackNames {
+			pack, err := resource.Compile(fmt.Sprintf("packcache/%s.mcpack", name))
+			if err != nil {
+				continue
+			}
+			cachedPacks = append(cachedPacks, pack)
+		}
+		for _, pack := range packs {
+			packData := make([]byte, pack.Len())
+			_, err = pack.ReadAt(packData, 0)
+			if err != nil {
+				continue
+			}
+			name := fmt.Sprintf("%s_%s", pack.UUID(), pack.Version())
+			_ = os.WriteFile(fmt.Sprintf("packcache/%s.mcpack", name), packData, 0644)
+		}
+	}
 
 	a.remoteAddress = address
 	a.localPort = uint16(port)
@@ -104,7 +141,7 @@ func (a *App) Connect(address string) error {
 
 	a.listener, err = minecraft.ListenConfig{
 		StatusProvider:    p,
-		ResourcePacks:     packs,
+		ResourcePacks:     append(packs, cachedPacks...),
 		AcceptedProtocols: []minecraft.Protocol{tedac.Protocol{}},
 	}.Listen("raknet", fmt.Sprintf(":%d", port))
 	if err != nil {
@@ -148,6 +185,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 	clientData := conn.ClientData()
 	if _, ok := conn.Protocol().(tedac.Protocol); ok { // TODO: Adjust this inside Protocol itself.
 		clientData.GameVersion = protocol.CurrentVersion
+		clientData.DeviceModel = "TEDAC CLIENT"
 	}
 
 	serverConn, err := minecraft.Dialer{
