@@ -61,6 +61,28 @@ type ItemType struct {
 	MetadataValue int16
 }
 
+// RecipeIngredientItem represents an item that may be used as a recipe ingredient.
+type RecipeIngredientItem struct {
+	// NetworkID is the numerical network ID of the item. This is sometimes a positive ID, and sometimes a
+	// negative ID, depending on what item it concerns.
+	NetworkID int32
+	// MetadataValue is the metadata value of the item. For some items, this is the damage value, whereas for
+	// other items it is simply an identifier of a variant of the item.
+	MetadataValue int32
+	// Count is the count of items that the recipe ingredient is required to have.
+	Count int32
+}
+
+// RecipeIngredient reads/writes a RecipeIngredientItem x using IO r.
+func RecipeIngredient(r protocol.IO, x *RecipeIngredientItem) {
+	r.Varint32(&x.NetworkID)
+	if x.NetworkID == 0 {
+		return
+	}
+	r.Varint32(&x.MetadataValue)
+	r.Varint32(&x.Count)
+}
+
 // shieldID represents the ID of a shield in the 1.16 item table.
 var shieldID, _ = legacymappings.ItemIDByName("minecraft:shield")
 

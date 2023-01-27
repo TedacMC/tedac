@@ -20,11 +20,6 @@ import (
 	_ "github.com/tedacmc/tedac/tedac/raknet"
 )
 
-//TODO:
-// - Support newer/custom items & blocks
-// - Fix incorrect block when interacting/placing/breaking (only on hive?)
-// - Fix slot switching doesn't work sometimes (items with enchantments?)
-
 // Protocol represents the v1.16.100 Protocol implementation.
 type Protocol struct{}
 
@@ -550,15 +545,151 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 	case *packet.CraftingData:
 		return []packet.Packet{
 			&legacypacket.CraftingData{
-				Recipes:                      []protocol.Recipe{},
-				PotionRecipes:                []protocol.PotionRecipe{},
-				PotionContainerChangeRecipes: []protocol.PotionContainerChangeRecipe{},
+				Recipes: lo.Map(pk.Recipes, func(r protocol.Recipe, _ int) legacyprotocol.Recipe {
+					switch data := r.(type) {
+					case *protocol.ShapelessRecipe:
+						recipe := &legacyprotocol.ShapelessRecipe{}
+						recipe.RecipeID = data.RecipeID
+						recipe.Input = lo.Map(data.Input, func(item protocol.ItemDescriptorCount, _ int) legacyprotocol.RecipeIngredientItem {
+							switch d := item.Descriptor.(type) {
+							case *protocol.DefaultItemDescriptor:
+								return legacyprotocol.RecipeIngredientItem{
+									NetworkID:     int32(d.NetworkID),
+									MetadataValue: int32(d.MetadataValue),
+									Count:         item.Count,
+								}
+							}
+							return legacyprotocol.RecipeIngredientItem{}
+						})
+						recipe.Output = lo.Map(data.Output, func(item protocol.ItemStack, _ int) legacyprotocol.ItemStack {
+							return downgradeItem(item)
+						})
+						recipe.UUID = data.UUID
+						recipe.Block = data.Block
+						recipe.Priority = data.Priority
+						recipe.RecipeNetworkID = data.RecipeNetworkID
+						return recipe
+					case *protocol.ShulkerBoxRecipe:
+						recipe := &legacyprotocol.ShulkerBoxRecipe{}
+						recipe.RecipeID = data.RecipeID
+						recipe.Input = lo.Map(data.Input, func(item protocol.ItemDescriptorCount, _ int) legacyprotocol.RecipeIngredientItem {
+							switch d := item.Descriptor.(type) {
+							case *protocol.DefaultItemDescriptor:
+								return legacyprotocol.RecipeIngredientItem{
+									NetworkID:     int32(d.NetworkID),
+									MetadataValue: int32(d.MetadataValue),
+									Count:         item.Count,
+								}
+							}
+							return legacyprotocol.RecipeIngredientItem{}
+						})
+						recipe.Output = lo.Map(data.Output, func(item protocol.ItemStack, _ int) legacyprotocol.ItemStack {
+							return downgradeItem(item)
+						})
+						recipe.UUID = data.UUID
+						recipe.Block = data.Block
+						recipe.Priority = data.Priority
+						recipe.RecipeNetworkID = data.RecipeNetworkID
+						return recipe
+					case *protocol.ShapelessChemistryRecipe:
+						recipe := &legacyprotocol.ShapelessChemistryRecipe{}
+						recipe.RecipeID = data.RecipeID
+						recipe.Input = lo.Map(data.Input, func(item protocol.ItemDescriptorCount, _ int) legacyprotocol.RecipeIngredientItem {
+							switch d := item.Descriptor.(type) {
+							case *protocol.DefaultItemDescriptor:
+								return legacyprotocol.RecipeIngredientItem{
+									NetworkID:     int32(d.NetworkID),
+									MetadataValue: int32(d.MetadataValue),
+									Count:         item.Count,
+								}
+							}
+							return legacyprotocol.RecipeIngredientItem{}
+						})
+						recipe.Output = lo.Map(data.Output, func(item protocol.ItemStack, _ int) legacyprotocol.ItemStack {
+							return downgradeItem(item)
+						})
+						recipe.UUID = data.UUID
+						recipe.Block = data.Block
+						recipe.Priority = data.Priority
+						recipe.RecipeNetworkID = data.RecipeNetworkID
+						return recipe
+					case *protocol.ShapedRecipe:
+						recipe := &legacyprotocol.ShapedRecipe{}
+						recipe.RecipeID = data.RecipeID
+						recipe.Width = data.Width
+						recipe.Height = data.Height
+						recipe.Input = lo.Map(data.Input, func(item protocol.ItemDescriptorCount, _ int) legacyprotocol.RecipeIngredientItem {
+							switch d := item.Descriptor.(type) {
+							case *protocol.DefaultItemDescriptor:
+								return legacyprotocol.RecipeIngredientItem{
+									NetworkID:     int32(d.NetworkID),
+									MetadataValue: int32(d.MetadataValue),
+									Count:         item.Count,
+								}
+							}
+							return legacyprotocol.RecipeIngredientItem{}
+						})
+						recipe.Output = lo.Map(data.Output, func(item protocol.ItemStack, _ int) legacyprotocol.ItemStack {
+							return downgradeItem(item)
+						})
+						recipe.UUID = data.UUID
+						recipe.Block = data.Block
+						recipe.Priority = data.Priority
+						recipe.RecipeNetworkID = data.RecipeNetworkID
+						return recipe
+					case *protocol.ShapedChemistryRecipe:
+						recipe := &legacyprotocol.ShapedChemistryRecipe{}
+						recipe.RecipeID = data.RecipeID
+						recipe.Width = data.Width
+						recipe.Height = data.Height
+						recipe.Input = lo.Map(data.Input, func(item protocol.ItemDescriptorCount, _ int) legacyprotocol.RecipeIngredientItem {
+							switch d := item.Descriptor.(type) {
+							case *protocol.DefaultItemDescriptor:
+								return legacyprotocol.RecipeIngredientItem{
+									NetworkID:     int32(d.NetworkID),
+									MetadataValue: int32(d.MetadataValue),
+									Count:         item.Count,
+								}
+							}
+							return legacyprotocol.RecipeIngredientItem{}
+						})
+						recipe.Output = lo.Map(data.Output, func(item protocol.ItemStack, _ int) legacyprotocol.ItemStack {
+							return downgradeItem(item)
+						})
+						recipe.UUID = data.UUID
+						recipe.Block = data.Block
+						recipe.Priority = data.Priority
+						recipe.RecipeNetworkID = data.RecipeNetworkID
+						return recipe
+					case *protocol.FurnaceRecipe:
+						recipe := &legacyprotocol.FurnaceRecipe{}
+						recipe.InputType = legacyprotocol.ItemType{
+							NetworkID:     data.InputType.NetworkID,
+							MetadataValue: int16(data.InputType.MetadataValue),
+						}
+						recipe.Output = downgradeItem(data.Output)
+						recipe.Block = data.Block
+						return recipe
+					case *protocol.FurnaceDataRecipe:
+						recipe := &legacyprotocol.FurnaceDataRecipe{}
+						recipe.InputType = legacyprotocol.ItemType{
+							NetworkID:     data.InputType.NetworkID,
+							MetadataValue: int16(data.InputType.MetadataValue),
+						}
+						recipe.Output = downgradeItem(data.Output)
+						recipe.Block = data.Block
+						return recipe
+					case *protocol.MultiRecipe:
+						recipe := &legacyprotocol.MultiRecipe{}
+						recipe.UUID = data.UUID
+						recipe.RecipeNetworkID = data.RecipeNetworkID
+						return recipe
+					}
+					return nil
+				}),
+				PotionRecipes:                pk.PotionRecipes,
+				PotionContainerChangeRecipes: pk.PotionContainerChangeRecipes,
 				ClearRecipes:                 pk.ClearRecipes,
-				//TODO: Translate these
-				//Recipes:                      pk.Recipes,
-				//PotionRecipes:                pk.PotionRecipes,
-				//PotionContainerChangeRecipes: pk.PotionContainerChangeRecipes,
-				//ClearRecipes:                 pk.ClearRecipes,
 			},
 		}
 	case *packet.CreativeContent:

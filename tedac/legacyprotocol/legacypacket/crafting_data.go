@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 )
 
 // CraftingData is sent by the server to let the client know all crafting data that the server maintains. This
@@ -12,7 +13,7 @@ import (
 type CraftingData struct {
 	// Recipes is a list of all recipes available on the server. It includes among others shapeless, shaped
 	// and furnace recipes. The client will only be able to craft these recipes.
-	Recipes []protocol.Recipe
+	Recipes []legacyprotocol.Recipe
 	// PotionRecipes is a list of all potion mixing recipes which may be used in the brewing stand.
 	PotionRecipes []protocol.PotionRecipe
 	// PotionContainerChangeRecipes is a list of all recipes to convert a potion from one type to another,
@@ -36,21 +37,21 @@ func (pk *CraftingData) Marshal(w *protocol.Writer) {
 	for _, recipe := range pk.Recipes {
 		var c int32
 		switch recipe.(type) {
-		case *protocol.ShapelessRecipe:
+		case *legacyprotocol.ShapelessRecipe:
 			c = protocol.RecipeShapeless
-		case *protocol.ShapedRecipe:
+		case *legacyprotocol.ShapedRecipe:
 			c = protocol.RecipeShaped
-		case *protocol.FurnaceRecipe:
+		case *legacyprotocol.FurnaceRecipe:
 			c = protocol.RecipeFurnace
-		case *protocol.FurnaceDataRecipe:
+		case *legacyprotocol.FurnaceDataRecipe:
 			c = protocol.RecipeFurnaceData
-		case *protocol.MultiRecipe:
+		case *legacyprotocol.MultiRecipe:
 			c = protocol.RecipeMulti
-		case *protocol.ShulkerBoxRecipe:
+		case *legacyprotocol.ShulkerBoxRecipe:
 			c = protocol.RecipeShulkerBox
-		case *protocol.ShapelessChemistryRecipe:
+		case *legacyprotocol.ShapelessChemistryRecipe:
 			c = protocol.RecipeShapelessChemistry
-		case *protocol.ShapedChemistryRecipe:
+		case *legacyprotocol.ShapedChemistryRecipe:
 			c = protocol.RecipeShapedChemistry
 		default:
 			w.UnknownEnumOption(fmt.Sprintf("%T", recipe), "crafting recipe type")
@@ -67,29 +68,29 @@ func (pk *CraftingData) Marshal(w *protocol.Writer) {
 func (pk *CraftingData) Unmarshal(r *protocol.Reader) {
 	var length uint32
 	r.Varuint32(&length)
-	pk.Recipes = make([]protocol.Recipe, length)
+	pk.Recipes = make([]legacyprotocol.Recipe, length)
 	for i := uint32(0); i < length; i++ {
 		var recipeType int32
 		r.Varint32(&recipeType)
 
-		var recipe protocol.Recipe
+		var recipe legacyprotocol.Recipe
 		switch recipeType {
 		case protocol.RecipeShapeless:
-			recipe = &protocol.ShapelessRecipe{}
+			recipe = &legacyprotocol.ShapelessRecipe{}
 		case protocol.RecipeShaped:
-			recipe = &protocol.ShapedRecipe{}
+			recipe = &legacyprotocol.ShapedRecipe{}
 		case protocol.RecipeFurnace:
-			recipe = &protocol.FurnaceRecipe{}
+			recipe = &legacyprotocol.FurnaceRecipe{}
 		case protocol.RecipeFurnaceData:
-			recipe = &protocol.FurnaceDataRecipe{}
+			recipe = &legacyprotocol.FurnaceDataRecipe{}
 		case protocol.RecipeMulti:
-			recipe = &protocol.MultiRecipe{}
+			recipe = &legacyprotocol.MultiRecipe{}
 		case protocol.RecipeShulkerBox:
-			recipe = &protocol.ShulkerBoxRecipe{}
+			recipe = &legacyprotocol.ShulkerBoxRecipe{}
 		case protocol.RecipeShapelessChemistry:
-			recipe = &protocol.ShapelessChemistryRecipe{}
+			recipe = &legacyprotocol.ShapelessChemistryRecipe{}
 		case protocol.RecipeShapedChemistry:
-			recipe = &protocol.ShapedChemistryRecipe{}
+			recipe = &legacyprotocol.ShapedChemistryRecipe{}
 		default:
 			r.UnknownEnumOption(recipeType, "crafting data recipe type")
 		}
