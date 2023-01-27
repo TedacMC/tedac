@@ -48,7 +48,7 @@ function Home() {
                     Welcome to Tedac. 👋
                 </h1>
                 <p className="ml-12 mt-4 text-lg text-slate-600 max-w-3xl dark:text-slate-400">
-                    Tedac is a multi-version proxy that lets you join any Minecraft: Bedrock Edition server on v1.12.0,
+                    Tedac is a multi-version proxy that lets you join any Minecraft: Bedrock Edition server on v1.16.100,
                     no effort required.
                 </p>
             </div>
