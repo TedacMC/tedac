@@ -4,7 +4,7 @@ import {main} from '../models';
 
 export function CheckNetIsolation():Promise<boolean>;
 
-export function Connect(arg1:string):Promise<Error>;
+export function Connect(arg1:string):Promise<void>;
 
 export function ProxyingInfo():Promise<main.ProxyInfo>;
 

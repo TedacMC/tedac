@@ -12,7 +12,7 @@ require (
 	github.com/sandertv/gophertunnel v1.24.7
 	github.com/segmentio/fasthash v1.0.3
 	github.com/wailsapp/wails v1.16.9
-	github.com/wailsapp/wails/v2 v2.0.0
+	github.com/wailsapp/wails/v2 v2.3.1
 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1
 )
 
@@ -57,4 +57,4 @@ require (
 
 replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.4
 
-replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v0.0.20
+replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v0.0.21
