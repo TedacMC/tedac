@@ -56,7 +56,6 @@ func (Protocol) Packets() packet.Pool {
 	pool[packet.IDSetActorData] = func() packet.Packet { return &legacypacket.SetActorData{} }
 	pool[packet.IDStructureBlockUpdate] = func() packet.Packet { return &legacypacket.StructureBlockUpdate{} }
 	pool[packet.IDStructureTemplateDataRequest] = func() packet.Packet { return &legacypacket.StructureTemplateDataRequest{} }
-
 	return pool
 }
 
@@ -70,7 +69,7 @@ var nullBytes = []byte("null\n")
 
 // ConvertToLatest ...
 func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
-	fmt.Printf("1.16.100 -> 1.19.30: %T\n", pk)
+	fmt.Printf("1.16.100 -> 1.19.51: %T\n", pk)
 	switch pk := pk.(type) {
 	case *legacypacket.ActorPickRequest:
 		return []packet.Packet{
@@ -94,18 +93,6 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 			},
 		}
 	case *legacypacket.InventoryTransaction:
-		actions := make([]protocol.InventoryAction, 0, len(pk.Actions))
-		for _, action := range pk.Actions {
-			actions = append(actions, protocol.InventoryAction{
-				SourceType:    action.SourceType,
-				WindowID:      action.WindowID,
-				SourceFlags:   action.SourceFlags,
-				InventorySlot: action.InventorySlot,
-				OldItem:       protocol.ItemInstance{Stack: upgradeItem(action.OldItem)},
-				NewItem:       protocol.ItemInstance{Stack: upgradeItem(action.NewItem)},
-			})
-		}
-
 		var transactionData protocol.InventoryTransactionData
 		switch data := pk.TransactionData.(type) {
 		case *legacyprotocol.NormalTransactionData:
@@ -142,8 +129,139 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 		}
 		return []packet.Packet{
 			&packet.InventoryTransaction{
-				Actions:         actions,
+				LegacyRequestID: pk.LegacyRequestID,
+				LegacySetItemSlots: lo.Map(pk.LegacySetItemSlots, func(slot protocol.LegacySetItemSlot, _ int) protocol.LegacySetItemSlot {
+					return protocol.LegacySetItemSlot{
+						ContainerID: legacyprotocol.UpgradeContainerID(slot.ContainerID),
+						Slots:       slot.Slots,
+					}
+				}),
+				Actions: lo.Map(pk.Actions, func(action legacyprotocol.InventoryAction, _ int) protocol.InventoryAction {
+					return protocol.InventoryAction{
+						SourceType:    action.SourceType,
+						WindowID:      action.WindowID,
+						SourceFlags:   action.SourceFlags,
+						InventorySlot: action.InventorySlot,
+						OldItem:       protocol.ItemInstance{Stack: upgradeItem(action.OldItem)},
+						NewItem:       protocol.ItemInstance{Stack: upgradeItem(action.NewItem)},
+					}
+				}),
 				TransactionData: transactionData,
+			},
+		}
+	case *legacypacket.ItemStackRequest:
+		return []packet.Packet{
+			&packet.ItemStackRequest{
+				Requests: lo.Map(pk.Requests, func(request legacyprotocol.ItemStackRequest, _ int) protocol.ItemStackRequest {
+					return protocol.ItemStackRequest{
+						RequestID: request.RequestID,
+						Actions: lo.Map(request.Actions, func(action legacyprotocol.StackRequestAction, _ int) protocol.StackRequestAction {
+							switch data := action.(type) {
+							case *legacyprotocol.TakeStackRequestAction:
+								newAction := &protocol.TakeStackRequestAction{}
+								newAction.Count = data.Count
+								newAction.Source = protocol.StackRequestSlotInfo{
+									ContainerID:    legacyprotocol.UpgradeContainerID(data.Source.ContainerID),
+									Slot:           data.Source.Slot,
+									StackNetworkID: data.Source.StackNetworkID,
+								}
+								newAction.Destination = protocol.StackRequestSlotInfo{
+									ContainerID:    legacyprotocol.UpgradeContainerID(data.Destination.ContainerID),
+									Slot:           data.Destination.Slot,
+									StackNetworkID: data.Destination.StackNetworkID,
+								}
+								return newAction
+							case *legacyprotocol.PlaceStackRequestAction:
+								newAction := &protocol.PlaceStackRequestAction{}
+								newAction.Count = data.Count
+								newAction.Source = protocol.StackRequestSlotInfo{
+									ContainerID:    legacyprotocol.UpgradeContainerID(data.Source.ContainerID),
+									Slot:           data.Source.Slot,
+									StackNetworkID: data.Source.StackNetworkID,
+								}
+								newAction.Destination = protocol.StackRequestSlotInfo{
+									ContainerID:    legacyprotocol.UpgradeContainerID(data.Destination.ContainerID),
+									Slot:           data.Destination.Slot,
+									StackNetworkID: data.Destination.StackNetworkID,
+								}
+								return newAction
+							case *legacyprotocol.SwapStackRequestAction:
+								newAction := &protocol.SwapStackRequestAction{}
+								newAction.Source = protocol.StackRequestSlotInfo{
+									ContainerID:    legacyprotocol.UpgradeContainerID(data.Source.ContainerID),
+									Slot:           data.Source.Slot,
+									StackNetworkID: data.Source.StackNetworkID,
+								}
+								newAction.Destination = protocol.StackRequestSlotInfo{
+									ContainerID:    legacyprotocol.UpgradeContainerID(data.Destination.ContainerID),
+									Slot:           data.Destination.Slot,
+									StackNetworkID: data.Destination.StackNetworkID,
+								}
+								return newAction
+							case *legacyprotocol.DropStackRequestAction:
+								newAction := &protocol.DropStackRequestAction{}
+								newAction.Count = data.Count
+								newAction.Source = protocol.StackRequestSlotInfo{
+									ContainerID:    legacyprotocol.UpgradeContainerID(data.Source.ContainerID),
+									Slot:           data.Source.Slot,
+									StackNetworkID: data.Source.StackNetworkID,
+								}
+								newAction.Randomly = data.Randomly
+								return newAction
+							case *legacyprotocol.DestroyStackRequestAction:
+								newAction := &protocol.DestroyStackRequestAction{}
+								newAction.Count = data.Count
+								newAction.Source = protocol.StackRequestSlotInfo{
+									ContainerID:    legacyprotocol.UpgradeContainerID(data.Source.ContainerID),
+									Slot:           data.Source.Slot,
+									StackNetworkID: data.Source.StackNetworkID,
+								}
+								return newAction
+							case *legacyprotocol.ConsumeStackRequestAction:
+								newAction := &protocol.ConsumeStackRequestAction{}
+								newAction.Count = data.Count
+								newAction.Source = protocol.StackRequestSlotInfo{
+									ContainerID:    legacyprotocol.UpgradeContainerID(data.Source.ContainerID),
+									Slot:           data.Source.Slot,
+									StackNetworkID: data.Source.StackNetworkID,
+								}
+								return newAction
+							case *legacyprotocol.CreateStackRequestAction:
+								return &protocol.CreateStackRequestAction{
+									ResultsSlot: data.ResultsSlot,
+								}
+							case *legacyprotocol.LabTableCombineStackRequestAction:
+								return &protocol.LabTableCombineStackRequestAction{}
+							case *legacyprotocol.BeaconPaymentStackRequestAction:
+								return &protocol.BeaconPaymentStackRequestAction{
+									PrimaryEffect:   data.PrimaryEffect,
+									SecondaryEffect: data.SecondaryEffect,
+								}
+							case *legacyprotocol.CraftRecipeStackRequestAction:
+								return &protocol.CraftRecipeStackRequestAction{
+									RecipeNetworkID: data.RecipeNetworkID,
+								}
+							case *legacyprotocol.AutoCraftRecipeStackRequestAction:
+								return &protocol.AutoCraftRecipeStackRequestAction{
+									RecipeNetworkID: data.RecipeNetworkID,
+								}
+							case *legacyprotocol.CraftCreativeStackRequestAction:
+								return &protocol.CraftCreativeStackRequestAction{
+									CreativeItemNetworkID: data.CreativeItemNetworkID,
+								}
+							case *legacyprotocol.CraftNonImplementedStackRequestAction:
+								return &protocol.CraftNonImplementedStackRequestAction{}
+							case *legacyprotocol.CraftResultsDeprecatedStackRequestAction:
+								return &protocol.CraftResultsDeprecatedStackRequestAction{
+									ResultItems: lo.Map(data.ResultItems, func(stack legacyprotocol.ItemStack, _ int) protocol.ItemStack {
+										return upgradeItem(stack)
+									}),
+								}
+							}
+							return nil
+						}),
+					}
+				}),
 			},
 		}
 	case *legacypacket.MapInfoRequest:
@@ -237,7 +355,7 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 		return []packet.Packet{
 			&packet.SetActorData{
 				EntityRuntimeID: pk.EntityRuntimeID,
-				EntityMetadata:  pk.EntityMetadata,
+				EntityMetadata:  legacyprotocol.UpgradeEntityMetadata(pk.EntityMetadata),
 				Tick:            pk.Tick,
 			},
 		}
@@ -302,8 +420,12 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 
 // ConvertFromLatest ...
 func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []packet.Packet {
-	fmt.Printf("1.19.30 -> 1.16.100: %T\n", pk)
+	fmt.Printf("1.19.51 -> 1.16.100: %T\n", pk)
 	switch pk := pk.(type) {
+	case *packet.ActorEvent:
+		if pk.EventType > packet.ActorEventFinishedChargingCrossbow {
+			return nil
+		}
 	case *packet.AddActor:
 		return []packet.Packet{
 			&legacypacket.AddActor{
@@ -323,7 +445,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 						Min:   a.Min,
 					}
 				}),
-				EntityMetadata: pk.EntityMetadata,
+				EntityMetadata: legacyprotocol.DowngradeEntityMetadata(pk.EntityMetadata),
 				EntityLinks:    pk.EntityLinks,
 			},
 		}
@@ -335,7 +457,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				Item:            downgradeItem(pk.Item.Stack),
 				Position:        pk.Position,
 				Velocity:        pk.Velocity,
-				EntityMetadata:  pk.EntityMetadata,
+				EntityMetadata:  legacyprotocol.DowngradeEntityMetadata(pk.EntityMetadata),
 				FromFishing:     pk.FromFishing,
 			},
 		}
@@ -353,7 +475,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				Yaw:                    pk.Yaw,
 				HeadYaw:                pk.HeadYaw,
 				HeldItem:               downgradeItem(pk.HeldItem.Stack),
-				EntityMetadata:         pk.EntityMetadata,
+				EntityMetadata:         legacyprotocol.DowngradeEntityMetadata(pk.EntityMetadata),
 				CommandPermissionLevel: uint32(pk.AbilityData.CommandPermissions),
 				PermissionLevel:        uint32(pk.AbilityData.PlayerPermissions),
 				PlayerUniqueID:         pk.AbilityData.EntityUniqueID,
@@ -387,7 +509,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 							return legacyprotocol.CommandOverload{Parameters: lo.Map(o.Parameters, func(p protocol.CommandParameter, _ int) legacyprotocol.CommandParameter {
 								return legacyprotocol.CommandParameter{
 									Name:                p.Name,
-									Type:                p.Type,
+									Type:                legacyprotocol.DowngradeParamType(p.Type),
 									Optional:            p.Optional,
 									CollapseEnumOptions: true,
 									Enum:                legacyprotocol.CommandEnum(p.Enum),
@@ -408,8 +530,6 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			},
 		}
 	case *packet.ClientBoundMapItemData:
-		pixels := make([][]color.RGBA, pk.Height)
-		pixels = append(pixels, pk.Pixels)
 		return []packet.Packet{
 			&legacypacket.ClientBoundMapItemData{
 				MapID:          pk.MapID,
@@ -424,7 +544,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				Width:          pk.Width,
 				XOffset:        pk.XOffset,
 				YOffset:        pk.YOffset,
-				Pixels:         pixels,
+				Pixels:         [][]color.RGBA{pk.Pixels},
 			},
 		}
 	case *packet.CraftingData:
@@ -439,20 +559,6 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				//PotionRecipes:                pk.PotionRecipes,
 				//PotionContainerChangeRecipes: pk.PotionContainerChangeRecipes,
 				//ClearRecipes:                 pk.ClearRecipes,
-			},
-		}
-	case *packet.CraftingEvent:
-		return []packet.Packet{
-			&legacypacket.CraftingEvent{
-				WindowID:     pk.WindowID,
-				CraftingType: pk.CraftingType,
-				RecipeUUID:   pk.RecipeUUID,
-				Input: lo.Map(pk.Input, func(instance protocol.ItemInstance, _ int) legacyprotocol.ItemStack {
-					return downgradeItem(instance.Stack)
-				}),
-				Output: lo.Map(pk.Output, func(instance protocol.ItemInstance, _ int) legacyprotocol.ItemStack {
-					return downgradeItem(instance.Stack)
-				}),
 			},
 		}
 	case *packet.CreativeContent:
@@ -477,6 +583,9 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			},
 		}
 	case *packet.Event:
+		if pk.EventType > packet.EventTypeFishBucketed {
+			return nil
+		}
 		return []packet.Packet{
 			&legacypacket.Event{
 				EntityRuntimeID: pk.EntityRuntimeID,
@@ -520,30 +629,83 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				},
 			},
 		}
+	case *packet.InventoryTransaction:
+		var transactionData legacyprotocol.InventoryTransactionData
+		switch data := pk.TransactionData.(type) {
+		case *protocol.NormalTransactionData:
+			transactionData = &legacyprotocol.NormalTransactionData{}
+		case *protocol.MismatchTransactionData:
+			transactionData = &legacyprotocol.MismatchTransactionData{}
+		case *protocol.UseItemTransactionData:
+			transactionData = &legacyprotocol.UseItemTransactionData{
+				ActionType:      data.ActionType,
+				BlockPosition:   data.BlockPosition,
+				BlockFace:       data.BlockFace,
+				HotBarSlot:      data.HotBarSlot,
+				HeldItem:        downgradeItem(data.HeldItem.Stack),
+				Position:        data.Position,
+				ClickedPosition: data.ClickedPosition,
+				BlockRuntimeID:  downgradeBlockRuntimeID(data.BlockRuntimeID),
+			}
+		case *protocol.UseItemOnEntityTransactionData:
+			transactionData = &legacyprotocol.UseItemOnEntityTransactionData{
+				TargetEntityRuntimeID: data.TargetEntityRuntimeID,
+				ActionType:            data.ActionType,
+				HotBarSlot:            data.HotBarSlot,
+				HeldItem:              downgradeItem(data.HeldItem.Stack),
+				Position:              data.Position,
+				ClickedPosition:       data.ClickedPosition,
+			}
+		case *protocol.ReleaseItemTransactionData:
+			transactionData = &legacyprotocol.ReleaseItemTransactionData{
+				ActionType:   data.ActionType,
+				HotBarSlot:   data.HotBarSlot,
+				HeldItem:     downgradeItem(data.HeldItem.Stack),
+				HeadPosition: data.HeadPosition,
+			}
+		}
+		return []packet.Packet{
+			&legacypacket.InventoryTransaction{
+				LegacyRequestID: pk.LegacyRequestID,
+				LegacySetItemSlots: lo.Map(pk.LegacySetItemSlots, func(slot protocol.LegacySetItemSlot, _ int) protocol.LegacySetItemSlot {
+					return protocol.LegacySetItemSlot{
+						ContainerID: legacyprotocol.DowngradeContainerID(slot.ContainerID),
+						Slots:       slot.Slots,
+					}
+				}),
+				Actions: lo.Map(pk.Actions, func(action protocol.InventoryAction, _ int) legacyprotocol.InventoryAction {
+					return legacyprotocol.InventoryAction{
+						SourceType:    action.SourceType,
+						WindowID:      action.WindowID,
+						SourceFlags:   action.SourceFlags,
+						InventorySlot: action.InventorySlot,
+						OldItem:       downgradeItem(action.OldItem.Stack),
+						NewItem:       downgradeItem(action.NewItem.Stack),
+					}
+				}),
+				TransactionData: transactionData,
+			},
+		}
 	case *packet.ItemStackResponse:
 		return []packet.Packet{
 			&legacypacket.ItemStackResponse{
 				Responses: lo.Map(pk.Responses, func(response protocol.ItemStackResponse, _ int) legacyprotocol.ItemStackResponse {
-					containers := make([]legacyprotocol.StackResponseContainerInfo, 0, len(response.ContainerInfo))
-					for _, info := range response.ContainerInfo {
-						slots := make([]legacyprotocol.StackResponseSlotInfo, 0, len(info.SlotInfo))
-						for _, slot := range info.SlotInfo {
-							slots = append(slots, legacyprotocol.StackResponseSlotInfo{
-								Slot:           slot.Slot,
-								HotbarSlot:     slot.HotbarSlot,
-								Count:          slot.Count,
-								StackNetworkID: slot.StackNetworkID,
-							})
-						}
-						containers = append(containers, legacyprotocol.StackResponseContainerInfo{
-							ContainerID: info.ContainerID,
-							SlotInfo:    slots,
-						})
-					}
 					return legacyprotocol.ItemStackResponse{
-						Status:        response.Status,
-						RequestID:     response.RequestID,
-						ContainerInfo: containers,
+						Status:    response.Status,
+						RequestID: response.RequestID,
+						ContainerInfo: lo.Map(response.ContainerInfo, func(info protocol.StackResponseContainerInfo, _ int) legacyprotocol.StackResponseContainerInfo {
+							return legacyprotocol.StackResponseContainerInfo{
+								ContainerID: legacyprotocol.DowngradeContainerID(info.ContainerID),
+								SlotInfo: lo.Map(info.SlotInfo, func(slot protocol.StackResponseSlotInfo, _ int) legacyprotocol.StackResponseSlotInfo {
+									return legacyprotocol.StackResponseSlotInfo{
+										Slot:           slot.Slot,
+										HotbarSlot:     slot.HotbarSlot,
+										Count:          slot.Count,
+										StackNetworkID: slot.StackNetworkID,
+									}
+								}),
+							}
+						}),
 					}
 				}),
 			},
@@ -581,11 +743,9 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 		if pk.EventType == packet.LevelEventParticlesDestroyBlock || pk.EventType == packet.LevelEventParticlesCrackBlock {
 			pk.EventData = int32(downgradeBlockRuntimeID(uint32(pk.EventData)))
 		}
-	case *packet.MapInfoRequest:
-		return []packet.Packet{
-			&legacypacket.MapInfoRequest{
-				MapID: pk.MapID,
-			},
+	case *packet.LevelSoundEvent:
+		if pk.SoundType == packet.SoundEventPlace || pk.SoundType == packet.SoundEventHit || pk.SoundType == packet.SoundEventItemUseOn {
+			pk.ExtraData = int32(downgradeBlockRuntimeID(uint32(pk.ExtraData)))
 		}
 	case *packet.MobArmourEquipment:
 		return []packet.Packet{
@@ -688,7 +848,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 		return []packet.Packet{
 			&legacypacket.SetActorData{
 				EntityRuntimeID: pk.EntityRuntimeID,
-				EntityMetadata:  pk.EntityMetadata,
+				EntityMetadata:  legacyprotocol.DowngradeEntityMetadata(pk.EntityMetadata),
 				Tick:            pk.Tick,
 			},
 		}

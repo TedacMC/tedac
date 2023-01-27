@@ -298,3 +298,39 @@ func EnumConstraint(r *protocol.Reader, x *CommandEnumConstraint, enums []Comman
 
 	r.ByteSlice(&x.Constraints)
 }
+
+// DowngradeParamType downgrades the latest parameter type to the legacy parameter type.
+func DowngradeParamType(t uint32) uint32 {
+	if t&protocol.CommandArgValid != 0 {
+		switch t &^ protocol.CommandArgValid {
+		case protocol.CommandArgTypeInt:
+			t = CommandArgTypeInt
+		case protocol.CommandArgTypeFloat:
+			t = CommandArgTypeFloat
+		case protocol.CommandArgTypeValue:
+			t = CommandArgTypeValue
+		case protocol.CommandArgTypeWildcardInt:
+			t = CommandArgTypeWildcardInt
+		case protocol.CommandArgTypeOperator:
+			t = CommandArgTypeOperator
+		case protocol.CommandArgTypeTarget:
+			t = CommandArgTypeTarget
+		case protocol.CommandArgTypeFilepath:
+			t = CommandArgTypeFilepath
+		case protocol.CommandArgTypeString:
+			t = CommandArgTypeString
+		case protocol.CommandArgTypeBlockPosition:
+			t = CommandArgTypePosition
+		case protocol.CommandArgTypeMessage:
+			t = CommandArgTypeMessage
+		case protocol.CommandArgTypeRawText:
+			t = CommandArgTypeRawText
+		case protocol.CommandArgTypeJSON:
+			t = CommandArgTypeJSON
+		case protocol.CommandArgTypeCommand:
+			t = CommandArgTypeCommand
+		}
+		t |= CommandArgValid
+	}
+	return t
+}
