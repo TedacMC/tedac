@@ -256,17 +256,21 @@ func (recipe *FurnaceRecipe) Unmarshal(r *protocol.Reader) {
 // Marshal ...
 func (recipe *FurnaceDataRecipe) Marshal(w *protocol.Writer) {
 	w.Varint32(&recipe.InputType.NetworkID)
-	w.Int16(&recipe.InputType.MetadataValue)
+	aux := int32(recipe.InputType.MetadataValue)
+	w.Varint32(&aux)
 	WriteItem(w, &recipe.Output)
 	w.String(&recipe.Block)
 }
 
 // Unmarshal ...
 func (recipe *FurnaceDataRecipe) Unmarshal(r *protocol.Reader) {
+	var dataValue int32
 	r.Varint32(&recipe.InputType.NetworkID)
-	r.Int16(&recipe.InputType.MetadataValue)
+	r.Varint32(&dataValue)
 	Item(r, &recipe.Output)
 	r.String(&recipe.Block)
+
+	recipe.InputType.MetadataValue = int16(dataValue)
 }
 
 // Marshal ...

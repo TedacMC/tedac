@@ -961,7 +961,17 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			&legacypacket.ResourcePacksInfo{
 				TexturePackRequired: pk.TexturePackRequired,
 				HasScripts:          pk.HasScripts,
-				BehaviourPacks:      pk.BehaviourPacks,
+				BehaviourPacks: lo.Map(pk.BehaviourPacks, func(pack protocol.BehaviourPackInfo, _ int) legacyprotocol.ResourcePackInfo {
+					return legacyprotocol.ResourcePackInfo{
+						UUID:            pack.UUID,
+						Version:         pack.Version,
+						Size:            pack.Size,
+						ContentKey:      pack.ContentKey,
+						SubPackName:     pack.SubPackName,
+						ContentIdentity: pack.ContentIdentity,
+						HasScripts:      pack.HasScripts,
+					}
+				}),
 				TexturePacks: lo.Map(pk.TexturePacks, func(pack protocol.TexturePackInfo, _ int) legacyprotocol.ResourcePackInfo {
 					return legacyprotocol.ResourcePackInfo{
 						UUID:            pack.UUID,
@@ -1162,6 +1172,7 @@ func downgradeItem(input protocol.ItemStack) legacyprotocol.ItemStack {
 			MetadataValue: int16(input.MetadataValue),
 		},
 		Count:         int16(input.Count),
+		NBTData:       input.NBTData,
 		CanBePlacedOn: input.CanBePlacedOn,
 		CanBreak:      input.CanBreak,
 	}

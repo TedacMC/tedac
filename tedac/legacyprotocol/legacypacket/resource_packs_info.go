@@ -18,7 +18,7 @@ type ResourcePacksInfo struct {
 	HasScripts bool
 	// BehaviourPack is a list of behaviour packs that the client needs to download before joining the server.
 	// All of these behaviour packs will be applied together.
-	BehaviourPacks []protocol.BehaviourPackInfo
+	BehaviourPacks []legacyprotocol.ResourcePackInfo
 	// TexturePacks is a list of texture packs that the client needs to download before joining the server.
 	// The order of these texture packs is not relevant in this packet. It is however important in the
 	// ResourcePackStack packet.
