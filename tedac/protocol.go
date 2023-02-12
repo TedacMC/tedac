@@ -37,6 +37,7 @@ func (Protocol) Ver() string {
 func (Protocol) Packets() packet.Pool {
 	pool := packet.NewPool()
 	pool[packet.IDActorPickRequest] = func() packet.Packet { return &legacypacket.ActorPickRequest{} }
+	pool[packet.IDCommandRequest] = func() packet.Packet { return &legacypacket.CommandRequest{} }
 	pool[packet.IDCraftingEvent] = func() packet.Packet { return &legacypacket.CraftingEvent{} }
 	pool[packet.IDInventoryTransaction] = func() packet.Packet { return &legacypacket.InventoryTransaction{} }
 	pool[packet.IDItemStackRequest] = func() packet.Packet { return &legacypacket.ItemStackRequest{} }
@@ -71,6 +72,14 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 			&packet.ActorPickRequest{
 				EntityUniqueID: pk.EntityUniqueID,
 				HotBarSlot:     pk.HotBarSlot,
+			},
+		}
+	case *legacypacket.CommandRequest:
+		return []packet.Packet{
+			&packet.CommandRequest{
+				CommandLine:   pk.CommandLine,
+				CommandOrigin: pk.CommandOrigin,
+				Internal:      pk.Internal,
 			},
 		}
 	case *legacypacket.CraftingEvent:
@@ -682,6 +691,24 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 					case *protocol.MultiRecipe:
 						recipe := &legacyprotocol.MultiRecipe{}
 						recipe.UUID = data.UUID
+						recipe.RecipeNetworkID = data.RecipeNetworkID
+						return recipe
+					case *protocol.SmithingTransformRecipe:
+						recipe := &legacyprotocol.ShapelessRecipe{}
+						recipe.RecipeID = data.RecipeID
+						recipe.Input = lo.Map(append([]protocol.ItemDescriptorCount{}, data.Base, data.Addition), func(item protocol.ItemDescriptorCount, _ int) legacyprotocol.RecipeIngredientItem {
+							switch d := item.Descriptor.(type) {
+							case *protocol.DefaultItemDescriptor:
+								return legacyprotocol.RecipeIngredientItem{
+									NetworkID:     int32(d.NetworkID),
+									MetadataValue: int32(d.MetadataValue),
+									Count:         item.Count,
+								}
+							}
+							return legacyprotocol.RecipeIngredientItem{}
+						})
+						recipe.Output = append([]legacyprotocol.ItemStack{}, downgradeItem(data.Result))
+						recipe.Block = data.Block
 						recipe.RecipeNetworkID = data.RecipeNetworkID
 						return recipe
 					}
