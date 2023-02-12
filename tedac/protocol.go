@@ -34,6 +34,7 @@ func (Protocol) Ver() string {
 // Packets ...
 func (Protocol) Packets() packet.Pool {
 	pool := packet.NewPool()
+	pool[packet.IDCommandRequest] = func() packet.Packet { return &legacypacket.CommandRequest{} }
 	pool[packet.IDContainerClose] = func() packet.Packet { return &legacypacket.ContainerClose{} }
 	pool[packet.IDInventoryTransaction] = func() packet.Packet { return &legacypacket.InventoryTransaction{} }
 	pool[packet.IDMobEquipment] = func() packet.Packet { return &legacypacket.MobEquipment{} }
@@ -164,6 +165,14 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 			&packet.ContainerClose{
 				WindowID:   pk.WindowID,
 				ServerSide: false,
+			},
+		}
+	case *legacypacket.CommandRequest:
+		return []packet.Packet{
+			&packet.CommandRequest{
+				CommandLine:   pk.CommandLine,
+				CommandOrigin: pk.CommandOrigin,
+				Internal:      pk.Internal,
 			},
 		}
 	case *packet.AdventureSettings:
@@ -306,7 +315,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 	case *packet.AddActor:
 		return []packet.Packet{
 			&legacypacket.AddActor{
-				EntityMetadata:  pk.EntityMetadata,
+				EntityMetadata:  legacyprotocol.DowngradeEntityMetadata(pk.EntityMetadata),
 				EntityRuntimeID: pk.EntityRuntimeID,
 				EntityType:      pk.EntityType,
 				EntityUniqueID:  pk.EntityUniqueID,
@@ -347,7 +356,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				Yaw:                    pk.Yaw,
 				HeadYaw:                pk.HeadYaw,
 				HeldItem:               downgradeItem(pk.HeldItem.Stack),
-				EntityMetadata:         pk.EntityMetadata,
+				EntityMetadata:         legacyprotocol.DowngradeEntityMetadata(pk.EntityMetadata),
 				CommandPermissionLevel: uint32(pk.AbilityData.CommandPermissions),
 				PermissionLevel:        uint32(pk.AbilityData.PlayerPermissions),
 				DeviceID:               pk.DeviceID,
@@ -389,7 +398,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				Item:            downgradeItem(pk.Item.Stack),
 				Position:        pk.Position,
 				Velocity:        pk.Velocity,
-				EntityMetadata:  pk.EntityMetadata,
+				EntityMetadata:  legacyprotocol.DowngradeEntityMetadata(pk.EntityMetadata),
 				FromFishing:     pk.FromFishing,
 			},
 		}
@@ -494,7 +503,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 		return []packet.Packet{
 			&legacypacket.SetActorData{
 				EntityRuntimeID: pk.EntityRuntimeID,
-				EntityMetadata:  pk.EntityMetadata,
+				EntityMetadata:  legacyprotocol.DowngradeEntityMetadata(pk.EntityMetadata),
 			},
 		}
 	case *packet.InventorySlot:
