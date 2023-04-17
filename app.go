@@ -475,6 +475,11 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 				_ = conn.Flush()
 				continue
 			case *packet.LevelChunk:
+				if pk.SubChunkCount != protocol.SubChunkRequestModeLimitless && pk.SubChunkCount != protocol.SubChunkRequestModeLimited {
+					// No changes to be made here.
+					break
+				}
+
 				if _, ok := conn.Protocol().(tedac.Protocol); !ok {
 					// Only Tedac clients should receive the old format.
 					break
