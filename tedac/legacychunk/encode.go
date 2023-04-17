@@ -11,8 +11,9 @@ const (
 	SubChunkVersion = 8
 	// CurrentBlockVersion is the current version of blocks (states) of the game. This version is composed
 	// of 4 bytes indicating a version, interpreted as a big endian int. The current version represents
-	// 1.16.0.14 {1, 16, 0, 14}.
-	CurrentBlockVersion int32 = 17825806
+	// 1.19.70.15 {1, 19, 70, 15}.
+	CurrentBlockVersion int32 = (1 << 24) | (19 << 16) | (70 << 8) | 15
+	LegacyBlockVersion  int32 = (1 << 24) | (12 << 16) | (0 << 8) | 1
 )
 
 // pool is used to pool byte buffers used for encoding chunks.

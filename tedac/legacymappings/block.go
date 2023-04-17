@@ -3,7 +3,9 @@ package legacymappings
 import (
 	_ "embed"
 	"encoding/json"
+	"github.com/df-mc/worldupgrader/blockupgrader"
 	"github.com/tedacmc/tedac/tedac/latestmappings"
+	"github.com/tedacmc/tedac/tedac/legacychunk"
 )
 
 var (
@@ -18,7 +20,7 @@ var (
 	// stateToRuntimeID maps a block state hash to a runtime ID.
 	stateToRuntimeID = map[latestmappings.StateHash]uint32{}
 	// runtimeIDToState maps a runtime ID to a state.
-	runtimeIDToState = map[uint32]latestmappings.State{}
+	runtimeIDToState = map[uint32]blockupgrader.BlockState{}
 )
 
 // init reads all block entries from the resource JSON, and sets the according values in the maps.
@@ -35,21 +37,22 @@ func init() {
 
 	for latestRID, meta := range blockStateMetas {
 		name, properties, _ := latestmappings.RuntimeIDToState(uint32(latestRID))
-		if alias, ok := latestmappings.AliasFromUpdatedName(name); ok {
-			name = alias
-		}
+		state := blockupgrader.Upgrade(blockupgrader.BlockState{
+			Name:       name,
+			Properties: properties,
+			Version:    legacychunk.CurrentBlockVersion,
+		})
 
-		legacyID, ok := legacyIDs[name]
+		legacyID, ok := legacyIDs[state.Name]
 		if !ok {
 			// This block didn't exist in v1.12.0.
 			continue
 		}
 
-		state := latestmappings.State{Name: name, Properties: properties}
 		legacyRID := uint32(len(blocks))
 
 		blocks = append(blocks, BlockEntry{
-			Name:     name,
+			Name:     state.Name,
 			Data:     meta,
 			LegacyID: legacyID,
 		})
@@ -60,12 +63,13 @@ func init() {
 
 // StateToRuntimeID converts a name and its state properties to a runtime ID.
 func StateToRuntimeID(name string, properties map[string]any) uint32 {
-	if alias, ok := latestmappings.AliasFromUpdatedName(name); ok {
-		name = alias
-	}
-	rid, ok := stateToRuntimeID[latestmappings.HashState(latestmappings.State{Name: name, Properties: properties})]
+	rid, ok := stateToRuntimeID[latestmappings.HashState(blockupgrader.Upgrade(blockupgrader.BlockState{
+		Name:       name,
+		Properties: properties,
+		Version:    legacychunk.LegacyBlockVersion,
+	}))]
 	if !ok {
-		rid = stateToRuntimeID[latestmappings.HashState(latestmappings.State{Name: "minecraft:info_update"})]
+		rid = stateToRuntimeID[latestmappings.HashState(blockupgrader.BlockState{Name: "minecraft:info_update"})]
 	}
 	return rid
 }

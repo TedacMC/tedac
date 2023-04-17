@@ -5,9 +5,18 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
-// GameRules reads a map of game rules from Reader r. It sets one of the types 'bool', 'float32' or 'uint32'
+// GameRules see ReadGameRules and WriteGameRules for documentation
+func GameRules(io protocol.IO, x *map[string]any) {
+	IoBackwardsCompatibility(io, func(reader *protocol.Reader) {
+		ReadGameRules(reader, x)
+	}, func(writer *protocol.Writer) {
+		WriteGameRules(writer, x)
+	})
+}
+
+// ReadGameRules reads a map of game rules from Reader r. It sets one of the types 'bool', 'float32' or 'uint32'
 // to the map x, with the key being the name of the game rule.
-func GameRules(r *protocol.Reader, x *map[string]any) {
+func ReadGameRules(r *protocol.Reader, x *map[string]any) {
 	var count uint32
 	r.Varuint32(&count)
 	r.LimitUint32(count, mediumLimit)

@@ -27,7 +27,7 @@ func (MultiRakNet) Compression(conn net.Conn) packet.Compression {
 	if conn.(*raknet.Conn).ProtocolVersion() == legacyRakNet {
 		return ZLibCompression{}
 	}
-	return packet.SnappyCompression{}
+	return packet.SnappyCompression
 }
 
 // init registers the MultiRakNet network. It overrides the existing minecraft.RakNet network.

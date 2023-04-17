@@ -67,56 +67,15 @@ func (*PlayerList) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *PlayerList) Marshal(w *protocol.Writer) {
-	w.Uint8(&pk.ActionType)
-	l := uint32(len(pk.Entries))
-	w.Varuint32(&l)
-	for _, entry := range pk.Entries {
-		switch pk.ActionType {
-		case PlayerListActionAdd:
-			w.UUID(&entry.UUID)
-			w.Varint64(&entry.EntityUniqueID)
-			w.String(&entry.Username)
-			w.String(&entry.SkinID)
-			w.ByteSlice(&entry.SkinData)
-			w.ByteSlice(&entry.CapeData)
-			w.String(&entry.SkinGeometryName)
-			w.ByteSlice(&entry.SkinGeometry)
-			w.String(&entry.XUID)
-			w.String(&entry.PlatformChatID)
-		case PlayerListActionRemove:
-			w.UUID(&entry.UUID)
-		default:
-			panic("unknown player list action type")
-		}
-
-	}
-}
-
-// Unmarshal ...
-func (pk *PlayerList) Unmarshal(r *protocol.Reader) {
-	var c uint32
-	r.Uint8(&pk.ActionType)
-	r.Varuint32(&c)
-	pk.Entries = make([]PlayerListEntry, c)
-	for i := uint32(0); i < c; i++ {
-		switch pk.ActionType {
-		case PlayerListActionAdd:
-			r.UUID(&pk.Entries[i].UUID)
-			r.Varint64(&pk.Entries[i].EntityUniqueID)
-			r.String(&pk.Entries[i].Username)
-			r.String(&pk.Entries[i].SkinID)
-			r.ByteSlice(&pk.Entries[i].SkinData)
-			r.ByteSlice(&pk.Entries[i].CapeData)
-			r.String(&pk.Entries[i].SkinGeometryName)
-			r.ByteSlice(&pk.Entries[i].SkinGeometry)
-			r.String(&pk.Entries[i].XUID)
-			r.String(&pk.Entries[i].PlatformChatID)
-		case PlayerListActionRemove:
-			r.UUID(&pk.Entries[i].UUID)
-		default:
-			panic("unknown player list action type")
-		}
+func (pk *PlayerList) Marshal(io protocol.IO) {
+	io.Uint8(&pk.ActionType)
+	switch pk.ActionType {
+	case PlayerListActionAdd:
+		protocol.Slice(io, &pk.Entries)
+	case PlayerListActionRemove:
+		protocol.FuncIOSlice(io, &pk.Entries, PlayerListRemoveEntry)
+	default:
+		panic("unknown player list action type")
 	}
 }
 

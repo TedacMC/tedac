@@ -2,9 +2,7 @@ package main
 
 import (
 	"embed"
-
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
+	"fmt"
 )
 
 //go:embed all:frontend/dist
@@ -14,19 +12,29 @@ var assets embed.FS
 func main() {
 	// Create an instance of the app structure
 	app := NewApp()
-
-	// Create application with options
-	err := wails.Run(&options.App{
-		Title:         "Tedac",
-		Width:         905,
-		Height:        525,
-		Frameless:     true,
-		DisableResize: true,
-		Assets:        assets,
-		OnStartup:     app.startup,
-		Bind:          []any{app},
-	})
+	err := app.Connect("zeqa.net:19132")
 	if err != nil {
 		panic(err)
 	}
+	info, err := app.ProxyingInfo()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(info.LocalAddress)
+	select {}
+
+	// Create application with options
+	//err := wails.Run(&options.App{
+	//	Title:         "Tedac",
+	//	Width:         905,
+	//	Height:        525,
+	//	Frameless:     true,
+	//	DisableResize: true,
+	//	Assets:        assets,
+	//	OnStartup:     app.startup,
+	//	Bind:          []any{app},
+	//})
+	//if err != nil {
+	//	panic(err)
+	//}
 }

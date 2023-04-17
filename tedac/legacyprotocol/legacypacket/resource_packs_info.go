@@ -31,17 +31,9 @@ func (*ResourcePacksInfo) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *ResourcePacksInfo) Marshal(w *protocol.Writer) {
-	w.Bool(&pk.TexturePackRequired)
-	w.Bool(&pk.HasScripts)
-	protocol.SliceUint16Length(w, &pk.BehaviourPacks)
-	protocol.SliceUint16Length(w, &pk.TexturePacks)
-}
-
-// Unmarshal ...
-func (pk *ResourcePacksInfo) Unmarshal(r *protocol.Reader) {
-	r.Bool(&pk.TexturePackRequired)
-	r.Bool(&pk.HasScripts)
-	protocol.SliceUint16Length(r, &pk.BehaviourPacks)
-	protocol.SliceUint16Length(r, &pk.TexturePacks)
+func (pk *ResourcePacksInfo) Marshal(io protocol.IO) {
+	io.Bool(&pk.TexturePackRequired)
+	io.Bool(&pk.HasScripts)
+	protocol.SliceUint16Length(io, &pk.BehaviourPacks)
+	protocol.SliceUint16Length(io, &pk.TexturePacks)
 }

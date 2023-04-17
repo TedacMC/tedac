@@ -23,13 +23,7 @@ func (*SetActorData) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *SetActorData) Marshal(w *protocol.Writer) {
-	w.Varuint64(&pk.EntityRuntimeID)
-	w.EntityMetadata(&pk.EntityMetadata)
-}
-
-// Unmarshal ...
-func (pk *SetActorData) Unmarshal(r *protocol.Reader) {
-	r.Varuint64(&pk.EntityRuntimeID)
-	r.EntityMetadata(&pk.EntityMetadata)
+func (pk *SetActorData) Marshal(io protocol.IO) {
+	io.Varuint64(&pk.EntityRuntimeID)
+	io.EntityMetadata(&pk.EntityMetadata)
 }

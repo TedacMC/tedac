@@ -41,32 +41,18 @@ type InventoryAction struct {
 	NewItem ItemStack
 }
 
-// Marshal encodes an InventoryAction.
-func (x *InventoryAction) Marshal(w *protocol.Writer) {
-	w.Varuint32(&x.SourceType)
+// Marshal encodes/decodes an InventoryAction.
+func (x *InventoryAction) Marshal(io protocol.IO) {
+	io.Varuint32(&x.SourceType)
 	switch x.SourceType {
 	case InventoryActionSourceContainer, InventoryActionSourceTODO:
-		w.Varint32(&x.WindowID)
+		io.Varint32(&x.WindowID)
 	case InventoryActionSourceWorld:
-		w.Varuint32(&x.SourceFlags)
+		io.Varuint32(&x.SourceFlags)
 	}
-	w.Varuint32(&x.InventorySlot)
-	WriteItem(w, &x.OldItem)
-	WriteItem(w, &x.NewItem)
-}
-
-// Unmarshal decodes an InventoryAction.
-func (x *InventoryAction) Unmarshal(r *protocol.Reader) {
-	r.Varuint32(&x.SourceType)
-	switch x.SourceType {
-	case InventoryActionSourceContainer, InventoryActionSourceTODO:
-		r.Varint32(&x.WindowID)
-	case InventoryActionSourceWorld:
-		r.Varuint32(&x.SourceFlags)
-	}
-	r.Varuint32(&x.InventorySlot)
-	Item(r, &x.OldItem)
-	Item(r, &x.NewItem)
+	io.Varuint32(&x.InventorySlot)
+	Item(io, &x.OldItem)
+	Item(io, &x.NewItem)
 }
 
 // InventoryTransactionData represents an object that holds data specific to an inventory transaction type.

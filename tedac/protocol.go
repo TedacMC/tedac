@@ -244,11 +244,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			},
 		}
 	case *packet.LevelChunk:
-		if pk.SubChunkRequestMode != protocol.SubChunkRequestModeLegacy {
-			// TODO: Support other sub-chunk request modes.
-			return nil
-		}
-
+		// TODO: Support other sub-chunk request modes.
 		buf := bytes.NewBuffer(pk.RawPayload)
 		oldFormat := conn.GameData().BaseGameVersion == "1.17.40"
 		c, err := chunk.NetworkDecode(latestAirRID, buf, int(pk.SubChunkCount), oldFormat, world.Overworld.Range())
