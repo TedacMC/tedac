@@ -1,9 +1,12 @@
 package legacymappings
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
 	"github.com/df-mc/worldupgrader/blockupgrader"
+	"github.com/sandertv/gophertunnel/minecraft/nbt"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/tedacmc/tedac/tedac/latestmappings"
 	"github.com/tedacmc/tedac/tedac/legacychunk"
 )
@@ -11,8 +14,8 @@ import (
 var (
 	//go:embed block_id_map.json
 	blockIDData []byte
-	//go:embed block_state_meta_map.json
-	blockStateMetaData []byte
+	//go:embed 1.12.0_to_1.18.10_blockstate_map.bin
+	blockStateMap []byte
 
 	// blocks holds a list of all existing v in the game.
 	blocks []BlockEntry
@@ -30,34 +33,36 @@ func init() {
 		panic(err)
 	}
 
-	var blockStateMetas []int16
-	if err := json.Unmarshal(blockStateMetaData, &blockStateMetas); err != nil {
-		panic(err)
-	}
+	buf := protocol.NewReader(bytes.NewBuffer(blockStateMap), 0)
+	var length uint32
+	buf.Varuint32(&length)
+	for i := uint32(0); i < length; i++ {
+		var legacyStringId string
+		buf.String(&legacyStringId)
 
-	for latestRID, meta := range blockStateMetas {
-		name, properties, _ := latestmappings.RuntimeIDToState(uint32(latestRID))
-		state := blockupgrader.Upgrade(blockupgrader.BlockState{
-			Name:       name,
-			Properties: properties,
-			Version:    legacychunk.CurrentBlockVersion,
-		})
+		var pairs uint32
+		buf.Varuint32(&pairs)
+		for y := uint32(0); y < pairs; y++ {
+			var meta uint32
+			buf.Varuint32(&meta)
 
-		legacyID, ok := legacyIDs[state.Name]
-		if !ok {
-			// This block didn't exist in v1.12.0.
-			continue
+			var blockStateRaw map[string]any
+			buf.NBT(&blockStateRaw, nbt.LittleEndian)
+			latestBlockState := blockupgrader.Upgrade(blockupgrader.BlockState{
+				Name:       blockStateRaw["name"].(string),
+				Properties: blockStateRaw["states"].(map[string]any),
+				Version:    blockStateRaw["version"].(int32),
+			})
+			legacyId, _ := legacyIDs[legacyStringId]
+			legacyRID := uint32(len(blocks))
+			blocks = append(blocks, BlockEntry{
+				Name:     legacyStringId,
+				Data:     int16(meta),
+				LegacyID: legacyId,
+			})
+			stateToRuntimeID[latestmappings.HashState(latestBlockState)] = legacyRID
+			runtimeIDToState[legacyRID] = latestBlockState
 		}
-
-		legacyRID := uint32(len(blocks))
-
-		blocks = append(blocks, BlockEntry{
-			Name:     state.Name,
-			Data:     meta,
-			LegacyID: legacyID,
-		})
-		stateToRuntimeID[latestmappings.HashState(state)] = legacyRID
-		runtimeIDToState[legacyRID] = state
 	}
 }
 
