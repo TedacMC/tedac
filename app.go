@@ -117,6 +117,9 @@ func (a *App) Connect(address string) error {
 	}
 	packs := conn.ResourcePacks()
 	_ = conn.Close()
+	if conn.GameData().ServerAuthoritativeInventory {
+		return fmt.Errorf("servers with authoritative inventories are currently not supported")
+	}
 
 	var cachedPacks []*resource.Pack
 	if useCache {

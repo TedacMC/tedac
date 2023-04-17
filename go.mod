@@ -14,7 +14,7 @@ require (
 	github.com/sandertv/gophertunnel v1.28.1
 	github.com/segmentio/fasthash v1.0.3
 	github.com/wailsapp/wails v1.16.9
-	github.com/wailsapp/wails/v2 v2.4.1
+	github.com/wailsapp/wails/v2 v2.0.0
 	golang.org/x/oauth2 v0.4.0
 )
 
@@ -24,6 +24,7 @@ require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
 	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/labstack/echo/v4 v4.9.0 // indirect
