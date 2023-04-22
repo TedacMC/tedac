@@ -33,19 +33,10 @@ func (*MobEquipment) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *MobEquipment) Marshal(w *protocol.Writer) {
-	w.Varuint64(&pk.EntityRuntimeID)
-	legacyprotocol.WriteItem(w, &pk.NewItem)
-	w.Uint8(&pk.InventorySlot)
-	w.Uint8(&pk.HotBarSlot)
-	w.Uint8(&pk.WindowID)
-}
-
-// Unmarshal ...
-func (pk *MobEquipment) Unmarshal(r *protocol.Reader) {
-	r.Varuint64(&pk.EntityRuntimeID)
-	legacyprotocol.Item(r, &pk.NewItem)
-	r.Uint8(&pk.InventorySlot)
-	r.Uint8(&pk.HotBarSlot)
-	r.Uint8(&pk.WindowID)
+func (pk *MobEquipment) Marshal(io protocol.IO) {
+	io.Varuint64(&pk.EntityRuntimeID)
+	legacyprotocol.Item(io, &pk.NewItem)
+	io.Uint8(&pk.InventorySlot)
+	io.Uint8(&pk.HotBarSlot)
+	io.Uint8(&pk.WindowID)
 }

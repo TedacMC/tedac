@@ -24,17 +24,9 @@ func (*InventoryContent) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *InventoryContent) Marshal(w *protocol.Writer) {
-	w.Varuint32(&pk.WindowID)
-	protocol.FuncSlice(w, &pk.Content, func(stack *legacyprotocol.ItemStack) {
-		legacyprotocol.WriteItem(w, stack)
-	})
-}
-
-// Unmarshal ...
-func (pk *InventoryContent) Unmarshal(r *protocol.Reader) {
-	r.Varuint32(&pk.WindowID)
-	protocol.FuncSlice(r, &pk.Content, func(stack *legacyprotocol.ItemStack) {
-		legacyprotocol.Item(r, stack)
+func (pk *InventoryContent) Marshal(io protocol.IO) {
+	io.Varuint32(&pk.WindowID)
+	protocol.FuncSlice(io, &pk.Content, func(stack *legacyprotocol.ItemStack) {
+		legacyprotocol.Item(io, stack)
 	})
 }

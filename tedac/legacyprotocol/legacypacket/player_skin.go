@@ -43,27 +43,14 @@ func (*PlayerSkin) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *PlayerSkin) Marshal(w *protocol.Writer) {
-	w.UUID(&pk.UUID)
-	w.String(&pk.SkinID)
-	w.String(&pk.NewSkinName)
-	w.String(&pk.OldSkinName)
-	w.ByteSlice(&pk.SkinData)
-	w.ByteSlice(&pk.CapeData)
-	w.String(&pk.SkinGeometryName)
-	w.ByteSlice(&pk.SkinGeometry)
-	w.Bool(&pk.PremiumSkin)
-}
-
-// Unmarshal ...
-func (pk *PlayerSkin) Unmarshal(r *protocol.Reader) {
-	r.UUID(&pk.UUID)
-	r.String(&pk.SkinID)
-	r.String(&pk.NewSkinName)
-	r.String(&pk.OldSkinName)
-	r.ByteSlice(&pk.SkinData)
-	r.ByteSlice(&pk.CapeData)
-	r.String(&pk.SkinGeometryName)
-	r.ByteSlice(&pk.SkinGeometry)
-	r.Bool(&pk.PremiumSkin)
+func (pk *PlayerSkin) Marshal(io protocol.IO) {
+	io.UUID(&pk.UUID)
+	io.String(&pk.SkinID)
+	io.String(&pk.NewSkinName)
+	io.String(&pk.OldSkinName)
+	io.ByteSlice(&pk.SkinData)
+	io.ByteSlice(&pk.CapeData)
+	io.String(&pk.SkinGeometryName)
+	io.ByteSlice(&pk.SkinGeometry)
+	io.Bool(&pk.PremiumSkin)
 }

@@ -21,11 +21,6 @@ func (*GameRulesChanged) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *GameRulesChanged) Marshal(w *protocol.Writer) {
-	legacyprotocol.WriteGameRules(w, &pk.GameRules)
-}
-
-// Unmarshal ...
-func (pk *GameRulesChanged) Unmarshal(r *protocol.Reader) {
-	legacyprotocol.GameRules(r, &pk.GameRules)
+func (pk *GameRulesChanged) Marshal(io protocol.IO) {
+	legacyprotocol.GameRules(io, &pk.GameRules)
 }

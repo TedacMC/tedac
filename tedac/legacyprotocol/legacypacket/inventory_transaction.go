@@ -37,36 +37,10 @@ func (*InventoryTransaction) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *InventoryTransaction) Marshal(w *protocol.Writer) {
-	var id uint32
-	switch pk.TransactionData.(type) {
-	case nil, *legacyprotocol.NormalTransactionData:
-		id = InventoryTransactionTypeNormal
-	case *legacyprotocol.MismatchTransactionData:
-		id = InventoryTransactionTypeMismatch
-	case *legacyprotocol.UseItemTransactionData:
-		id = InventoryTransactionTypeUseItem
-	case *legacyprotocol.UseItemOnEntityTransactionData:
-		id = InventoryTransactionTypeUseItemOnEntity
-	case *legacyprotocol.ReleaseItemTransactionData:
-		id = InventoryTransactionTypeReleaseItem
-	}
-	w.Varuint32(&id)
-	protocol.FuncSlice(w, &pk.Actions, func(action *legacyprotocol.InventoryAction) {
-		action.Marshal(w)
-	})
-	if pk.TransactionData != nil {
-		pk.TransactionData.Marshal(w)
-	}
-}
-
-// Unmarshal ...
-func (pk *InventoryTransaction) Unmarshal(r *protocol.Reader) {
+func (pk *InventoryTransaction) Marshal(io protocol.IO) {
 	var transactionType uint32
-	r.Varuint32(&transactionType)
-	protocol.FuncSlice(r, &pk.Actions, func(action *legacyprotocol.InventoryAction) {
-		action.Unmarshal(r)
-	})
+	io.Varuint32(&transactionType)
+	protocol.Slice(io, &pk.Actions)
 	switch transactionType {
 	case InventoryTransactionTypeNormal:
 		pk.TransactionData = &legacyprotocol.NormalTransactionData{}
@@ -79,7 +53,7 @@ func (pk *InventoryTransaction) Unmarshal(r *protocol.Reader) {
 	case InventoryTransactionTypeReleaseItem:
 		pk.TransactionData = &legacyprotocol.ReleaseItemTransactionData{}
 	default:
-		r.UnknownEnumOption(transactionType, "inventory transaction type")
+		io.UnknownEnumOption(transactionType, "inventory transaction type")
 	}
-	pk.TransactionData.Unmarshal(r)
+	legacyprotocol.IoBackwardsCompatibility(io, pk.TransactionData.Unmarshal, pk.TransactionData.Marshal)
 }

@@ -22,13 +22,7 @@ func (*ActorPickRequest) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *ActorPickRequest) Marshal(w *protocol.Writer) {
-	w.Int64(&pk.EntityUniqueID)
-	w.Uint8(&pk.HotBarSlot)
-}
-
-// Unmarshal ...
-func (pk *ActorPickRequest) Unmarshal(r *protocol.Reader) {
-	r.Int64(&pk.EntityUniqueID)
-	r.Uint8(&pk.HotBarSlot)
+func (pk *ActorPickRequest) Marshal(io protocol.IO) {
+	io.Int64(&pk.EntityUniqueID)
+	io.Uint8(&pk.HotBarSlot)
 }

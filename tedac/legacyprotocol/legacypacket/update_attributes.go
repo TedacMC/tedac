@@ -24,13 +24,7 @@ func (*UpdateAttributes) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *UpdateAttributes) Marshal(w *protocol.Writer) {
-	w.Varuint64(&pk.EntityRuntimeID)
-	protocol.Slice(w, &pk.Attributes)
-}
-
-// Unmarshal ...
-func (pk *UpdateAttributes) Unmarshal(r *protocol.Reader) {
-	r.Varuint64(&pk.EntityRuntimeID)
-	protocol.Slice(r, &pk.Attributes)
+func (pk *UpdateAttributes) Marshal(io protocol.IO) {
+	io.Varuint64(&pk.EntityRuntimeID)
+	protocol.Slice(io, &pk.Attributes)
 }

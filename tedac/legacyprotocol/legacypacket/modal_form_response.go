@@ -25,13 +25,7 @@ func (*ModalFormResponse) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *ModalFormResponse) Marshal(w *protocol.Writer) {
-	w.Varuint32(&pk.FormID)
-	w.ByteSlice(&pk.ResponseData)
-}
-
-// Unmarshal ...
-func (pk *ModalFormResponse) Unmarshal(r *protocol.Reader) {
-	r.Varuint32(&pk.FormID)
-	r.ByteSlice(&pk.ResponseData)
+func (pk *ModalFormResponse) Marshal(io protocol.IO) {
+	io.Varuint32(&pk.FormID)
+	io.ByteSlice(&pk.ResponseData)
 }

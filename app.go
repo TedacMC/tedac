@@ -100,7 +100,7 @@ func (a *App) Connect(address string) error {
 	var cachedPackNames []string
 	conn, err := minecraft.Dialer{
 		TokenSource: a.src,
-		DownloadResourcePack: func(id uuid.UUID, version string) bool {
+		DownloadResourcePack: func(id uuid.UUID, version string, _, _ int) bool {
 			if useCache {
 				name := fmt.Sprintf("%s_%s", id, version)
 				_, err = os.Stat(fmt.Sprintf("packcache/%s.mcpack", name))
@@ -117,6 +117,9 @@ func (a *App) Connect(address string) error {
 	}
 	packs := conn.ResourcePacks()
 	_ = conn.Close()
+	if conn.GameData().ServerAuthoritativeInventory {
+		return fmt.Errorf("servers with authoritative inventories are currently not supported")
+	}
 
 	var cachedPacks []*resource.Pack
 	if useCache {
@@ -475,17 +478,18 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 				_ = conn.Flush()
 				continue
 			case *packet.LevelChunk:
-				if pk.SubChunkRequestMode == protocol.SubChunkRequestModeLegacy {
+				if pk.SubChunkCount != protocol.SubChunkRequestModeLimitless && pk.SubChunkCount != protocol.SubChunkRequestModeLimited {
 					// No changes to be made here.
 					break
 				}
+
 				if _, ok := conn.Protocol().(tedac.Protocol); !ok {
 					// Only Tedac clients should receive the old format.
 					break
 				}
 
 				max := r.Height() >> 4
-				if pk.SubChunkRequestMode == protocol.SubChunkRequestModeLimited {
+				if pk.SubChunkCount == protocol.SubChunkRequestModeLimited {
 					max = int(pk.HighestSubChunk)
 				}
 

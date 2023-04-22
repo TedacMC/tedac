@@ -3,6 +3,7 @@ package legacypacket
 import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 )
 
 // ResourcePackChunkData is sent to the client so that the client can download the resource pack. Each packet
@@ -28,25 +29,10 @@ func (*ResourcePackChunkData) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *ResourcePackChunkData) Marshal(w *protocol.Writer) {
-	w.String(&pk.UUID)
-	w.Uint32(&pk.ChunkIndex)
-	w.Uint64(&pk.DataOffset)
+func (pk *ResourcePackChunkData) Marshal(io protocol.IO) {
+	io.String(&pk.UUID)
+	io.Uint32(&pk.ChunkIndex)
+	io.Uint64(&pk.DataOffset)
 
-	dataLen := uint32(len(pk.Data))
-	w.Uint32(&dataLen)
-	w.Bytes(&pk.Data)
-}
-
-// Unmarshal ...
-func (pk *ResourcePackChunkData) Unmarshal(r *protocol.Reader) {
-	r.String(&pk.UUID)
-	r.Uint32(&pk.ChunkIndex)
-	r.Uint64(&pk.DataOffset)
-
-	var dataLen uint32
-	r.Uint32(&dataLen)
-
-	pk.Data = make([]byte, dataLen)
-	r.Bytes(&pk.Data)
+	legacyprotocol.ByteSlice(io, pk.Data)
 }

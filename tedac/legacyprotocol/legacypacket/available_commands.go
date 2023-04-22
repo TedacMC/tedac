@@ -22,8 +22,12 @@ func (*AvailableCommands) ID() uint32 {
 	return packet.IDAvailableCommands
 }
 
-// Marshal ...
-func (pk *AvailableCommands) Marshal(w *protocol.Writer) {
+func (pk *AvailableCommands) Marshal(io protocol.IO) {
+	legacyprotocol.IoBackwardsCompatibility(io, pk.unmarshal, pk.marshal)
+}
+
+// marshal ...
+func (pk *AvailableCommands) marshal(w *protocol.Writer) {
 	values, valueIndices := pk.enumValues()
 	suffixes, suffixIndices := pk.suffixes()
 	enums, enumIndices := pk.enums()
@@ -73,8 +77,8 @@ func (pk *AvailableCommands) Marshal(w *protocol.Writer) {
 	// }
 }
 
-// Unmarshal ...
-func (pk *AvailableCommands) Unmarshal(r *protocol.Reader) {
+// unmarshal ...
+func (pk *AvailableCommands) unmarshal(r *protocol.Reader) {
 	var count uint32
 
 	// First we read all the enum values and suffixes.

@@ -4,33 +4,25 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/df-mc/worldupgrader/blockupgrader"
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
 	"github.com/segmentio/fasthash/fnv1"
+	"github.com/tedacmc/tedac/tedac/legacychunk"
 	"sort"
 	"strings"
 	"unsafe"
 )
-
-// State holds a combination of a name and properties, together with a version.
-type State struct {
-	// Name is the name of the block.
-	Name string `nbt:"name"`
-	// Properties is a map of properties that define the block's state.
-	Properties map[string]any `nbt:"states"`
-	// Version is the version of the block state.
-	Version int32 `nbt:"version"`
-}
 
 var (
 	//go:embed block_states.nbt
 	blockStateData []byte
 
 	// states holds a list of all possible vanilla block states.
-	states []State
+	states []blockupgrader.BlockState
 	// stateRuntimeIDs holds a map for looking up the runtime ID of a block by the stateHash it produces.
 	stateRuntimeIDs = map[StateHash]uint32{}
 	// runtimeIDToState holds a map for looking up the blockState of a block by its runtime ID.
-	runtimeIDToState = map[uint32]State{}
+	runtimeIDToState = map[uint32]blockupgrader.BlockState{}
 )
 
 var (
@@ -57,7 +49,7 @@ func init() {
 
 	// Register all block states present in the block_states.nbt file. These are all possible options registered
 	// blocks may encode to.
-	var s State
+	var s blockupgrader.BlockState
 	for {
 		if err := dec.Decode(&s); err != nil {
 			break
@@ -72,7 +64,7 @@ func init() {
 }
 
 // Adjust adjusts the latest mappings to account for custom states.
-func Adjust(customStates []State) {
+func Adjust(customStates []blockupgrader.BlockState) {
 	adjustedStates := append(states, customStates...)
 	sort.SliceStable(adjustedStates, func(i, j int) bool {
 		stateOne, stateTwo := adjustedStates[i], adjustedStates[j]
@@ -83,7 +75,7 @@ func Adjust(customStates []State) {
 	})
 
 	stateRuntimeIDs = make(map[StateHash]uint32, len(adjustedStates))
-	runtimeIDToState = make(map[uint32]State, len(adjustedStates))
+	runtimeIDToState = make(map[uint32]blockupgrader.BlockState, len(adjustedStates))
 	for rid, state := range adjustedStates {
 		stateRuntimeIDs[HashState(state)] = uint32(rid)
 		runtimeIDToState[uint32(rid)] = state
@@ -92,10 +84,11 @@ func Adjust(customStates []State) {
 
 // StateToRuntimeID converts a name and its state properties to a runtime ID.
 func StateToRuntimeID(name string, properties map[string]any) (runtimeID uint32, found bool) {
-	if updated, ok := UpdatedNameFromAlias(name); ok {
-		name = updated
-	}
-	rid, ok := stateRuntimeIDs[HashState(State{Name: name, Properties: properties})]
+	rid, ok := stateRuntimeIDs[HashState(blockupgrader.Upgrade(blockupgrader.BlockState{
+		Name:       name,
+		Properties: properties,
+		Version:    legacychunk.CurrentBlockVersion,
+	}))]
 	return rid, ok
 }
 
@@ -124,7 +117,7 @@ type StateHash struct {
 }
 
 // HashState produces a hash for the block properties held by the blockState.
-func HashState(state State) StateHash {
+func HashState(state blockupgrader.BlockState) StateHash {
 	if state.Properties == nil {
 		return StateHash{Name: state.Name}
 	}
