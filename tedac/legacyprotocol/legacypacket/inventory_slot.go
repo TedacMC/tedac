@@ -27,15 +27,8 @@ func (*InventorySlot) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *InventorySlot) Marshal(w *protocol.Writer) {
+func (pk *InventorySlot) Marshal(w protocol.IO) {
 	w.Varuint32(&pk.WindowID)
 	w.Varuint32(&pk.Slot)
 	legacyprotocol.WriteItemInst(w, &pk.NewItem)
-}
-
-// Unmarshal ...
-func (pk *InventorySlot) Unmarshal(r *protocol.Reader) {
-	r.Varuint32(&pk.WindowID)
-	r.Varuint32(&pk.Slot)
-	legacyprotocol.ItemInst(r, &pk.NewItem)
 }

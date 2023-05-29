@@ -39,19 +39,10 @@ func (*Event) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *Event) Marshal(w *protocol.Writer) {
+func (pk *Event) Marshal(w protocol.IO) {
 	w.Varuint64(&pk.EntityRuntimeID)
 	w.Varint32(&pk.EventType)
 	w.Uint8(&pk.UsePlayerID)
-
-	// TODO: Add fields for all Event types.
-}
-
-// Unmarshal ...
-func (pk *Event) Unmarshal(r *protocol.Reader) {
-	r.Varuint64(&pk.EntityRuntimeID)
-	r.Varint32(&pk.EventType)
-	r.Uint8(&pk.UsePlayerID)
 
 	// TODO: Add fields for all Event types.
 }

@@ -51,7 +51,7 @@ func (*InventoryTransaction) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *InventoryTransaction) Marshal(w *protocol.Writer) {
+func (pk *InventoryTransaction) Marshal(w protocol.IO) {
 	w.Varint32(&pk.LegacyRequestID)
 	if pk.LegacyRequestID != 0 {
 		protocol.FuncSlice(w, &pk.LegacySetItemSlots, func(slot *protocol.LegacySetItemSlot) {
@@ -79,40 +79,4 @@ func (pk *InventoryTransaction) Marshal(w *protocol.Writer) {
 	if pk.TransactionData != nil {
 		pk.TransactionData.Marshal(w)
 	}
-}
-
-// Unmarshal ...
-func (pk *InventoryTransaction) Unmarshal(r *protocol.Reader) {
-	var length, transactionType uint32
-	r.Varint32(&pk.LegacyRequestID)
-	if pk.LegacyRequestID != 0 {
-		protocol.FuncSlice(r, &pk.LegacySetItemSlots, func(slot *protocol.LegacySetItemSlot) {
-			slot.Marshal(r)
-		})
-	}
-	r.Varuint32(&transactionType)
-	r.Bool(&pk.HasNetworkIDs)
-	r.Varuint32(&length)
-	r.LimitUint32(length, 512)
-	pk.Actions = make([]legacyprotocol.InventoryAction, length)
-	for i := uint32(0); i < length; i++ {
-		// Each InventoryTransaction packet has a list of actions at the start, with a transaction data object
-		// after that, depending on the transaction type.
-		pk.Actions[i].Unmarshal(r, pk.HasNetworkIDs)
-	}
-	switch transactionType {
-	case InventoryTransactionTypeNormal:
-		pk.TransactionData = &legacyprotocol.NormalTransactionData{}
-	case InventoryTransactionTypeMismatch:
-		pk.TransactionData = &legacyprotocol.MismatchTransactionData{}
-	case InventoryTransactionTypeUseItem:
-		pk.TransactionData = &legacyprotocol.UseItemTransactionData{}
-	case InventoryTransactionTypeUseItemOnEntity:
-		pk.TransactionData = &legacyprotocol.UseItemOnEntityTransactionData{}
-	case InventoryTransactionTypeReleaseItem:
-		pk.TransactionData = &legacyprotocol.ReleaseItemTransactionData{}
-	default:
-		r.UnknownEnumOption(transactionType, "inventory transaction type")
-	}
-	pk.TransactionData.Unmarshal(r)
 }

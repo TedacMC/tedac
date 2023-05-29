@@ -65,7 +65,7 @@ var nullBytes = []byte("null\n")
 
 // ConvertToLatest ...
 func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
-	fmt.Printf("1.16.100 -> 1.19.51: %T\n", pk)
+	fmt.Printf("1.16.100 -> 1.19.8x: %T\n", pk)
 	switch pk := pk.(type) {
 	case *legacypacket.ActorPickRequest:
 		return []packet.Packet{
@@ -424,7 +424,7 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 
 // ConvertFromLatest ...
 func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []packet.Packet {
-	fmt.Printf("1.19.51 -> 1.16.100: %T\n", pk)
+	fmt.Printf("1.19.8x -> 1.16.100: %T\n", pk)
 	switch pk := pk.(type) {
 	case *packet.ActorEvent:
 		if pk.EventType > packet.ActorEventFinishedChargingCrossbow {
@@ -741,13 +741,11 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			},
 		}
 	case *packet.Event:
-		if pk.EventType > packet.EventTypeFishBucketed {
-			return nil
-		}
+		// TODO: support
 		return []packet.Packet{
 			&legacypacket.Event{
 				EntityRuntimeID: pk.EntityRuntimeID,
-				EventType:       pk.EventType,
+				EventType:       0,
 				UsePlayerID:     pk.UsePlayerID,
 			},
 		}
@@ -869,11 +867,6 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			},
 		}
 	case *packet.LevelChunk:
-		if pk.SubChunkRequestMode != protocol.SubChunkRequestModeLegacy {
-			// TODO: Support other sub-chunk request modes.
-			return nil
-		}
-
 		buf := bytes.NewBuffer(pk.RawPayload)
 		oldFormat := conn.GameData().BaseGameVersion == "1.17.40"
 		c, err := chunk.NetworkDecode(latestAirRID, buf, int(pk.SubChunkCount), oldFormat, world.Overworld.Range())
@@ -1041,6 +1034,10 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 		}
 	case *packet.StartGame:
 		// TODO: Adjust our mappings to account for any possible custom blocks.
+		force, ok := pk.ForceExperimentalGameplay.Value()
+		if !ok {
+			force = ok
+		}
 		return []packet.Packet{
 			&legacypacket.StartGame{
 				EntityUniqueID:                 pk.EntityUniqueID,
@@ -1091,7 +1088,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				LimitedWorldWidth:               pk.LimitedWorldWidth,
 				LimitedWorldDepth:               pk.LimitedWorldDepth,
 				NewNether:                       pk.NewNether,
-				ForceExperimentalGameplay:       pk.ForceExperimentalGameplay,
+				ForceExperimentalGameplay:       force,
 				LevelID:                         pk.LevelID,
 				WorldName:                       pk.WorldName,
 				TemplateContentIdentity:         pk.TemplateContentIdentity,

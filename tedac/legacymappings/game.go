@@ -5,9 +5,8 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
-// BlockEntry is an entry for a custom block found in the StartGame packet. The runtime ID of these custom
-// block entries is based on the index they have in the block palette when the palette is ordered
-// alphabetically.
+// BlockEntry is a block sent in the StartGame packet block runtime ID table. It holds a name and a metadata
+// value of a block.
 type BlockEntry struct {
 	// Name is the name of the custom block.
 	Name string

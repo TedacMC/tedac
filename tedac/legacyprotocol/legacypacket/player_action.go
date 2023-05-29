@@ -57,17 +57,9 @@ func (*PlayerAction) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *PlayerAction) Marshal(w *protocol.Writer) {
+func (pk *PlayerAction) Marshal(w protocol.IO) {
 	w.Varuint64(&pk.EntityRuntimeID)
 	w.Varint32(&pk.ActionType)
 	w.UBlockPos(&pk.BlockPosition)
 	w.Varint32(&pk.BlockFace)
-}
-
-// Unmarshal ...
-func (pk *PlayerAction) Unmarshal(r *protocol.Reader) {
-	r.Varuint64(&pk.EntityRuntimeID)
-	r.Varint32(&pk.ActionType)
-	r.UBlockPos(&pk.BlockPosition)
-	r.Varint32(&pk.BlockFace)
 }

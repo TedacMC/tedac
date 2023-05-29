@@ -6,6 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"os"
+	"os/exec"
+	"runtime"
+	"sync"
+
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -19,11 +25,6 @@ import (
 	"github.com/tedacmc/tedac/tedac/latestmappings"
 	"github.com/wailsapp/wails/lib/renderer/webview"
 	"golang.org/x/oauth2"
-	"net"
-	"os"
-	"os/exec"
-	"runtime"
-	"sync"
 )
 
 // App ...
@@ -96,7 +97,7 @@ func (a *App) Connect(address string) error {
 	var cachedPackNames []string
 	conn, err := minecraft.Dialer{
 		TokenSource: a.src,
-		DownloadResourcePack: func(id uuid.UUID, version string) bool {
+		DownloadResourcePack: func(id uuid.UUID, version string, _, _ int) bool {
 			if useCache {
 				name := fmt.Sprintf("%s_%s", id, version)
 				_, err = os.Stat(fmt.Sprintf("packcache/%s.mcpack", name))
@@ -301,17 +302,18 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 				_ = conn.Flush()
 				continue
 			case *packet.LevelChunk:
-				if pk.SubChunkRequestMode == protocol.SubChunkRequestModeLegacy {
+				if pk.SubChunkCount != protocol.SubChunkRequestModeLimitless && pk.SubChunkCount != protocol.SubChunkRequestModeLimited {
 					// No changes to be made here.
 					break
 				}
+
 				if _, ok := conn.Protocol().(tedac.Protocol); !ok {
 					// Only Tedac clients should receive the old format.
 					break
 				}
 
 				max := r.Height() >> 4
-				if pk.SubChunkRequestMode == protocol.SubChunkRequestModeLimited {
+				if pk.SubChunkCount == protocol.SubChunkRequestModeLimited {
 					max = int(pk.HighestSubChunk)
 				}
 

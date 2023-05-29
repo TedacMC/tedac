@@ -94,7 +94,7 @@ func (pk *PlayerAuthInput) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *PlayerAuthInput) Marshal(w *protocol.Writer) {
+func (pk *PlayerAuthInput) Marshal(w protocol.IO) {
 	w.Float32(&pk.Pitch)
 	w.Float32(&pk.Yaw)
 	w.Vec3(&pk.Position)
@@ -108,21 +108,4 @@ func (pk *PlayerAuthInput) Marshal(w *protocol.Writer) {
 	}
 	w.Varuint64(&pk.Tick)
 	w.Vec3(&pk.Delta)
-}
-
-// Unmarshal ...
-func (pk *PlayerAuthInput) Unmarshal(r *protocol.Reader) {
-	r.Float32(&pk.Pitch)
-	r.Float32(&pk.Yaw)
-	r.Vec3(&pk.Position)
-	r.Vec2(&pk.MoveVector)
-	r.Float32(&pk.HeadYaw)
-	r.Varuint64(&pk.InputData)
-	r.Varuint32(&pk.InputMode)
-	r.Varuint32(&pk.PlayMode)
-	if pk.PlayMode == PlayModeReality {
-		r.Vec3(&pk.GazeDirection)
-	}
-	r.Varuint64(&pk.Tick)
-	r.Vec3(&pk.Delta)
 }

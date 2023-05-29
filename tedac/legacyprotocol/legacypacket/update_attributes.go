@@ -26,15 +26,8 @@ func (*UpdateAttributes) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *UpdateAttributes) Marshal(w *protocol.Writer) {
+func (pk *UpdateAttributes) Marshal(w protocol.IO) {
 	w.Varuint64(&pk.EntityRuntimeID)
 	legacyprotocol.WriteAttributes(w, &pk.Attributes)
 	w.Varuint64(&pk.Tick)
-}
-
-// Unmarshal ...
-func (pk *UpdateAttributes) Unmarshal(r *protocol.Reader) {
-	r.Varuint64(&pk.EntityRuntimeID)
-	legacyprotocol.Attributes(r, &pk.Attributes)
-	r.Varuint64(&pk.Tick)
 }

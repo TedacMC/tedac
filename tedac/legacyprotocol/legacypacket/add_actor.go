@@ -53,7 +53,7 @@ func (*AddActor) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *AddActor) Marshal(w *protocol.Writer) {
+func (pk *AddActor) Marshal(w protocol.IO) {
 	w.Varint64(&pk.EntityUniqueID)
 	w.Varuint64(&pk.EntityRuntimeID)
 	w.String(&pk.EntityType)
@@ -65,19 +65,4 @@ func (pk *AddActor) Marshal(w *protocol.Writer) {
 	legacyprotocol.WriteInitialAttributes(w, &pk.Attributes)
 	w.EntityMetadata(&pk.EntityMetadata)
 	protocol.Slice(w, &pk.EntityLinks)
-}
-
-// Unmarshal ...
-func (pk *AddActor) Unmarshal(r *protocol.Reader) {
-	r.Varint64(&pk.EntityUniqueID)
-	r.Varuint64(&pk.EntityRuntimeID)
-	r.String(&pk.EntityType)
-	r.Vec3(&pk.Position)
-	r.Vec3(&pk.Velocity)
-	r.Float32(&pk.Pitch)
-	r.Float32(&pk.Yaw)
-	r.Float32(&pk.HeadYaw)
-	legacyprotocol.InitialAttributes(r, &pk.Attributes)
-	r.EntityMetadata(&pk.EntityMetadata)
-	protocol.Slice(r, &pk.EntityLinks)
 }

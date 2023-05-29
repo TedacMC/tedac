@@ -60,7 +60,7 @@ func (*StructureBlockUpdate) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *StructureBlockUpdate) Marshal(w *protocol.Writer) {
+func (pk *StructureBlockUpdate) Marshal(w protocol.IO) {
 	w.UBlockPos(&pk.Position)
 	w.String(&pk.StructureName)
 	w.String(&pk.DataField)
@@ -70,17 +70,4 @@ func (pk *StructureBlockUpdate) Marshal(w *protocol.Writer) {
 	legacyprotocol.StructSettings(w, &pk.Settings)
 	w.Varint32(&pk.RedstoneSaveMode)
 	w.Bool(&pk.ShouldTrigger)
-}
-
-// Unmarshal ...
-func (pk *StructureBlockUpdate) Unmarshal(r *protocol.Reader) {
-	r.UBlockPos(&pk.Position)
-	r.String(&pk.StructureName)
-	r.String(&pk.DataField)
-	r.Bool(&pk.IncludePlayers)
-	r.Bool(&pk.ShowBoundingBox)
-	r.Varint32(&pk.StructureBlockType)
-	legacyprotocol.StructSettings(r, &pk.Settings)
-	r.Varint32(&pk.RedstoneSaveMode)
-	r.Bool(&pk.ShouldTrigger)
 }

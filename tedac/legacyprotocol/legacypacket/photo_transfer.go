@@ -28,15 +28,8 @@ func (*PhotoTransfer) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *PhotoTransfer) Marshal(w *protocol.Writer) {
+func (pk *PhotoTransfer) Marshal(w protocol.IO) {
 	w.String(&pk.PhotoName)
 	w.ByteSlice(&pk.PhotoData)
 	w.String(&pk.BookID)
-}
-
-// Unmarshal ...
-func (pk *PhotoTransfer) Unmarshal(r *protocol.Reader) {
-	r.String(&pk.PhotoName)
-	r.ByteSlice(&pk.PhotoData)
-	r.String(&pk.BookID)
 }

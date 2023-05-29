@@ -2,6 +2,7 @@ package legacyprotocol
 
 import (
 	"fmt"
+
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
@@ -66,7 +67,7 @@ type Skin struct {
 
 // WriteSerialisedSkin writes a Skin x to Writer w. WriteSerialisedSkin panics if the fields of the skin
 // have invalid values, usually indicating that the dimensions of the skin images are incorrect.
-func WriteSerialisedSkin(w *protocol.Writer, x *Skin) {
+func WriteSerialisedSkin(w protocol.IO, x *Skin) {
 	if err := x.validate(); err != nil {
 		panic(err)
 	}

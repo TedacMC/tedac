@@ -4,20 +4,19 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"strings"
+
+	"github.com/df-mc/worldupgrader/blockupgrader"
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/tedacmc/tedac/tedac/latestmappings"
-	"strings"
+	"github.com/tedacmc/tedac/tedac/legacychunk"
 )
 
 const (
 	// SubChunkVersion is the current version of the written sub chunks, specifying the format they are
 	// written on disk and over network.
 	SubChunkVersion = 9
-	// CurrentBlockVersion is the current version of blocks (states) of the game. This version is composed
-	// of 4 bytes indicating a version, interpreted as a big endian int. The current version represents
-	// 1.16.0.14 {1, 16, 0, 14}.
-	CurrentBlockVersion int32 = 17825806
 )
 
 type (
@@ -65,10 +64,10 @@ func (blockPaletteEncoding) encode(buf *bytes.Buffer, v uint32) {
 	// Get the block state registered with the runtime IDs we have in the palette of the block storage
 	// as we need the name and data value to store.
 	name, props, _ := latestmappings.RuntimeIDToState(v)
-	_ = nbt.NewEncoderWithEncoding(buf, nbt.LittleEndian).Encode(latestmappings.State{Name: name, Properties: props, Version: CurrentBlockVersion})
+	_ = nbt.NewEncoderWithEncoding(buf, nbt.LittleEndian).Encode(blockupgrader.BlockState{Name: name, Properties: props, Version: legacychunk.LegacyBlockVersion})
 }
 func (blockPaletteEncoding) decode(buf *bytes.Buffer) (uint32, error) {
-	var e latestmappings.State
+	var e blockupgrader.BlockState
 	if err := nbt.NewDecoderWithEncoding(buf, nbt.LittleEndian).Decode(&e); err != nil {
 		return 0, fmt.Errorf("error decoding block palette entry: %w", err)
 	}
@@ -125,7 +124,7 @@ func (networkPersistentEncoding) encodePalette(buf *bytes.Buffer, p *Palette, _ 
 	enc := nbt.NewEncoderWithEncoding(buf, nbt.NetworkLittleEndian)
 	for _, val := range p.values {
 		name, props, _ := latestmappings.RuntimeIDToState(val)
-		_ = enc.Encode(latestmappings.State{Name: strings.TrimPrefix("minecraft:", name), Properties: props, Version: CurrentBlockVersion})
+		_ = enc.Encode(blockupgrader.BlockState{Name: strings.TrimPrefix("minecraft:", name), Properties: props, Version: legacychunk.CurrentBlockVersion})
 	}
 }
 func (networkPersistentEncoding) decodePalette(buf *bytes.Buffer, blockSize paletteSize, _ paletteEncoding) (*Palette, error) {
@@ -140,7 +139,7 @@ func (networkPersistentEncoding) decodePalette(buf *bytes.Buffer, blockSize pale
 		}
 	}
 
-	blocks := make([]latestmappings.State, paletteCount)
+	blocks := make([]blockupgrader.BlockState, paletteCount)
 	dec := nbt.NewDecoderWithEncoding(buf, nbt.NetworkLittleEndian)
 	for i := int32(0); i < paletteCount; i++ {
 		if err := dec.Decode(&blocks[i]); err != nil {

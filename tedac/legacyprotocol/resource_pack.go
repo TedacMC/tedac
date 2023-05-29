@@ -58,3 +58,21 @@ func (x *StackResourcePack) Marshal(r protocol.IO) {
 	r.String(&x.Version)
 	r.String(&x.SubPackName)
 }
+
+// PackInfo reads/writes a ResourcePackInfo x using IO r.
+func PackInfo(r protocol.IO, x *ResourcePackInfo) {
+	r.String(&x.UUID)
+	r.String(&x.Version)
+	r.Uint64(&x.Size)
+	r.String(&x.ContentKey)
+	r.String(&x.SubPackName)
+	r.String(&x.ContentIdentity)
+	r.Bool(&x.HasScripts)
+}
+
+// StackPack reads/writes a StackResourcePack x using IO r.
+func StackPack(r protocol.IO, x *StackResourcePack) {
+	r.String(&x.UUID)
+	r.String(&x.Version)
+	r.String(&x.SubPackName)
+}

@@ -85,7 +85,7 @@ func (*AddPlayer) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *AddPlayer) Marshal(w *protocol.Writer) {
+func (pk *AddPlayer) Marshal(w protocol.IO) {
 	w.UUID(&pk.UUID)
 	w.String(&pk.Username)
 	w.Varint64(&pk.EntityUniqueID)
@@ -107,29 +107,4 @@ func (pk *AddPlayer) Marshal(w *protocol.Writer) {
 	protocol.Slice(w, &pk.EntityLinks)
 	w.String(&pk.DeviceID)
 	w.Int32(&pk.BuildPlatform)
-}
-
-// Unmarshal ...
-func (pk *AddPlayer) Unmarshal(r *protocol.Reader) {
-	r.UUID(&pk.UUID)
-	r.String(&pk.Username)
-	r.Varint64(&pk.EntityUniqueID)
-	r.Varuint64(&pk.EntityRuntimeID)
-	r.String(&pk.PlatformChatID)
-	r.Vec3(&pk.Position)
-	r.Vec3(&pk.Velocity)
-	r.Float32(&pk.Pitch)
-	r.Float32(&pk.Yaw)
-	r.Float32(&pk.HeadYaw)
-	legacyprotocol.Item(r, &pk.HeldItem)
-	r.EntityMetadata(&pk.EntityMetadata)
-	r.Varuint32(&pk.Flags)
-	r.Varuint32(&pk.CommandPermissionLevel)
-	r.Varuint32(&pk.ActionPermissions)
-	r.Varuint32(&pk.PermissionLevel)
-	r.Varuint32(&pk.CustomStoredPermissions)
-	r.Int64(&pk.PlayerUniqueID)
-	protocol.Slice(r, &pk.EntityLinks)
-	r.String(&pk.DeviceID)
-	r.Int32(&pk.BuildPlatform)
 }

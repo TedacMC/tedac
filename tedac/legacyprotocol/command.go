@@ -204,7 +204,7 @@ func CommandData(r *protocol.Reader, x *Command, enums []CommandEnum, suffixes [
 
 // WriteCommandData writes a Command x to Writer w, using the enum indices and suffix indices passed to
 // translate enums and suffixes to the indices that they're written in in the buffer.
-func WriteCommandData(w *protocol.Writer, x *Command, enumIndices map[string]int, suffixIndices map[string]int, dynamicEnumIndices map[string]int) {
+func WriteCommandData(w protocol.IO, x *Command, enumIndices map[string]int, suffixIndices map[string]int, dynamicEnumIndices map[string]int) {
 	l := uint32(len(x.Overloads))
 
 	alias := int32(-1)
@@ -228,7 +228,7 @@ func WriteCommandData(w *protocol.Writer, x *Command, enumIndices map[string]int
 
 // WriteCommandParam writes a CommandParameter x to Writer w, using the enum indices and suffix indices
 // to translate the respective values to the offset in the buffer.
-func WriteCommandParam(w *protocol.Writer, x *CommandParameter, enumIndices map[string]int, suffixIndices map[string]int, dynamicEnumIndices map[string]int) {
+func WriteCommandParam(w protocol.IO, x *CommandParameter, enumIndices map[string]int, suffixIndices map[string]int, dynamicEnumIndices map[string]int) {
 	if x.Enum.Dynamic {
 		x.Type = CommandArgSoftEnum | CommandArgValid | uint32(dynamicEnumIndices[x.Enum.Type])
 	} else if len(x.Enum.Options) != 0 {
@@ -277,7 +277,7 @@ type CommandEnumConstraint struct {
 }
 
 // WriteEnumConstraint writes a CommandEnumConstraint x to Writer w using the enum (value) indices passed.
-func WriteEnumConstraint(w *protocol.Writer, x *CommandEnumConstraint, enumIndices map[string]int, enumValueIndices map[string]int) {
+func WriteEnumConstraint(w protocol.IO, x *CommandEnumConstraint, enumIndices map[string]int, enumValueIndices map[string]int) {
 	enumValueIndex, enumIndex := uint32(enumValueIndices[x.EnumOption]), uint32(enumIndices[x.EnumName])
 	w.Uint32(&enumValueIndex)
 	w.Uint32(&enumIndex)

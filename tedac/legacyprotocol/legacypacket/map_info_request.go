@@ -19,11 +19,6 @@ func (*MapInfoRequest) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *MapInfoRequest) Marshal(w *protocol.Writer) {
+func (pk *MapInfoRequest) Marshal(w protocol.IO) {
 	w.Varint64(&pk.MapID)
-}
-
-// Unmarshal ...
-func (pk *MapInfoRequest) Unmarshal(r *protocol.Reader) {
-	r.Varint64(&pk.MapID)
 }

@@ -27,7 +27,7 @@ func ItemInst(r *protocol.Reader, x *ItemInstance) {
 }
 
 // WriteItemInst writes an item instance x to buffer dst.
-func WriteItemInst(w *protocol.Writer, x *ItemInstance) {
+func WriteItemInst(w protocol.IO, x *ItemInstance) {
 	w.Varint32(&x.StackNetworkID)
 	WriteItem(w, &x.Stack)
 	if (x.Stack.Count == 0 || x.Stack.NetworkID == 0) && x.StackNetworkID != 0 {
@@ -81,6 +81,17 @@ func RecipeIngredient(r protocol.IO, x *RecipeIngredientItem) {
 	}
 	r.Varint32(&x.MetadataValue)
 	r.Varint32(&x.Count)
+}
+
+// ItemEntry is an item sent in the StartGame item table. It holds a name and a legacy ID, which is used to
+// point back to that name.
+type ItemEntry struct {
+	// Name if the name of the item, which is a name like 'minecraft:stick'.
+	Name string
+	// LegacyID is the legacy ID of the item. It must point to either an existing item ID or a new one if it
+	// seeks to implement a new item.
+	LegacyID       int16
+	ComponentBased bool
 }
 
 // shieldID represents the ID of a shield in the 1.16 item table.
@@ -141,7 +152,7 @@ func Item(r *protocol.Reader, x *ItemStack) {
 }
 
 // WriteItem writes an item stack x to buffer dst.
-func WriteItem(w *protocol.Writer, x *ItemStack) {
+func WriteItem(w protocol.IO, x *ItemStack) {
 	w.Varint32(&x.NetworkID)
 	if x.NetworkID == 0 {
 		// The item was air, so there's no more data to follow. Return immediately.

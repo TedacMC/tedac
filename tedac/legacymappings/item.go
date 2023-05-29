@@ -3,6 +3,7 @@ package legacymappings
 import (
 	_ "embed"
 	"encoding/json"
+
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 

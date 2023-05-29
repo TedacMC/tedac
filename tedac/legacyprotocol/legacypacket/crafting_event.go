@@ -32,7 +32,7 @@ func (*CraftingEvent) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *CraftingEvent) Marshal(w *protocol.Writer) {
+func (pk *CraftingEvent) Marshal(w protocol.IO) {
 	inputLen, outputLen := uint32(len(pk.Input)), uint32(len(pk.Output))
 	w.Uint8(&pk.WindowID)
 	w.Varint32(&pk.CraftingType)
@@ -44,27 +44,5 @@ func (pk *CraftingEvent) Marshal(w *protocol.Writer) {
 	w.Varuint32(&outputLen)
 	for _, output := range pk.Output {
 		legacyprotocol.WriteItem(w, &output)
-	}
-}
-
-// Unmarshal ...
-func (pk *CraftingEvent) Unmarshal(r *protocol.Reader) {
-	var length uint32
-	r.Uint8(&pk.WindowID)
-	r.Varint32(&pk.CraftingType)
-	r.UUID(&pk.RecipeUUID)
-	r.Varuint32(&length)
-	r.LimitUint32(length, 64)
-
-	pk.Input = make([]legacyprotocol.ItemStack, length)
-	for i := uint32(0); i < length; i++ {
-		legacyprotocol.Item(r, &pk.Input[i])
-	}
-	r.Varuint32(&length)
-	r.LimitUint32(length, 64)
-
-	pk.Output = make([]legacyprotocol.ItemStack, length)
-	for i := uint32(0); i < length; i++ {
-		legacyprotocol.Item(r, &pk.Output[i])
 	}
 }

@@ -2,6 +2,7 @@ package legacypacket
 
 import (
 	"fmt"
+
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/tedacmc/tedac/tedac/legacyprotocol"
@@ -31,7 +32,7 @@ func (*CraftingData) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *CraftingData) Marshal(w *protocol.Writer) {
+func (pk *CraftingData) Marshal(w protocol.IO) {
 	l := uint32(len(pk.Recipes))
 	w.Varuint32(&l)
 	for _, recipe := range pk.Recipes {
@@ -62,43 +63,4 @@ func (pk *CraftingData) Marshal(w *protocol.Writer) {
 	protocol.Slice(w, &pk.PotionRecipes)
 	protocol.Slice(w, &pk.PotionContainerChangeRecipes)
 	w.Bool(&pk.ClearRecipes)
-}
-
-// Unmarshal ...
-func (pk *CraftingData) Unmarshal(r *protocol.Reader) {
-	var length uint32
-	r.Varuint32(&length)
-	pk.Recipes = make([]legacyprotocol.Recipe, length)
-	for i := uint32(0); i < length; i++ {
-		var recipeType int32
-		r.Varint32(&recipeType)
-
-		var recipe legacyprotocol.Recipe
-		switch recipeType {
-		case protocol.RecipeShapeless:
-			recipe = &legacyprotocol.ShapelessRecipe{}
-		case protocol.RecipeShaped:
-			recipe = &legacyprotocol.ShapedRecipe{}
-		case protocol.RecipeFurnace:
-			recipe = &legacyprotocol.FurnaceRecipe{}
-		case protocol.RecipeFurnaceData:
-			recipe = &legacyprotocol.FurnaceDataRecipe{}
-		case protocol.RecipeMulti:
-			recipe = &legacyprotocol.MultiRecipe{}
-		case protocol.RecipeShulkerBox:
-			recipe = &legacyprotocol.ShulkerBoxRecipe{}
-		case protocol.RecipeShapelessChemistry:
-			recipe = &legacyprotocol.ShapelessChemistryRecipe{}
-		case protocol.RecipeShapedChemistry:
-			recipe = &legacyprotocol.ShapedChemistryRecipe{}
-		default:
-			r.UnknownEnumOption(recipeType, "crafting data recipe type")
-		}
-		//goland:noinspection GoNilness
-		recipe.Unmarshal(r)
-		pk.Recipes[i] = recipe
-	}
-	protocol.Slice(r, &pk.PotionRecipes)
-	protocol.Slice(r, &pk.PotionContainerChangeRecipes)
-	r.Bool(&pk.ClearRecipes)
 }

@@ -2,6 +2,7 @@ package legacyprotocol
 
 import (
 	"fmt"
+
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
@@ -18,7 +19,7 @@ type ItemStackRequest struct {
 }
 
 // WriteStackRequest writes an ItemStackRequest x to Writer w.
-func WriteStackRequest(w *protocol.Writer, x *ItemStackRequest) {
+func WriteStackRequest(w protocol.IO, x *ItemStackRequest) {
 	l := uint32(len(x.Actions))
 	w.Varint32(&x.RequestID)
 	w.Varuint32(&l)
@@ -156,7 +157,7 @@ type StackResponseSlotInfo struct {
 }
 
 // WriteStackResponse writes an ItemStackResponse x to Writer w.
-func WriteStackResponse(w *protocol.Writer, x *ItemStackResponse) {
+func WriteStackResponse(w protocol.IO, x *ItemStackResponse) {
 	w.Uint8(&x.Status)
 	w.Varint32(&x.RequestID)
 	if x.Status != ItemStackResponseStatusOK {
@@ -186,7 +187,7 @@ func StackResponse(r *protocol.Reader, x *ItemStackResponse) {
 }
 
 // WriteStackContainerInfo writes a StackResponseContainerInfo x to Writer w.
-func WriteStackContainerInfo(w *protocol.Writer, x *StackResponseContainerInfo) {
+func WriteStackContainerInfo(w protocol.IO, x *StackResponseContainerInfo) {
 	w.Uint8(&x.ContainerID)
 	l := uint32(len(x.SlotInfo))
 	w.Varuint32(&l)
@@ -223,7 +224,7 @@ func StackSlotInfo(r protocol.IO, x *StackResponseSlotInfo) {
 // client, such as moving an item around the inventory or placing a block.
 type StackRequestAction interface {
 	// Marshal encodes the stack request action its binary representation into buf.
-	Marshal(w *protocol.Writer)
+	Marshal(w protocol.IO)
 	// Unmarshal decodes a serialised stack request action object from Reader r into the
 	// InventoryTransactionData instance.
 	Unmarshal(r *protocol.Reader)
@@ -257,7 +258,7 @@ type transferStackRequestAction struct {
 }
 
 // Marshal ...
-func (a *transferStackRequestAction) Marshal(w *protocol.Writer) {
+func (a *transferStackRequestAction) Marshal(w protocol.IO) {
 	w.Uint8(&a.Count)
 	StackReqSlotInfo(w, &a.Source)
 	StackReqSlotInfo(w, &a.Destination)
@@ -292,7 +293,7 @@ type SwapStackRequestAction struct {
 }
 
 // Marshal ...
-func (a *SwapStackRequestAction) Marshal(w *protocol.Writer) {
+func (a *SwapStackRequestAction) Marshal(w protocol.IO) {
 	StackReqSlotInfo(w, &a.Source)
 	StackReqSlotInfo(w, &a.Destination)
 }
@@ -318,7 +319,7 @@ type DropStackRequestAction struct {
 }
 
 // Marshal ...
-func (a *DropStackRequestAction) Marshal(w *protocol.Writer) {
+func (a *DropStackRequestAction) Marshal(w protocol.IO) {
 	w.Uint8(&a.Count)
 	StackReqSlotInfo(w, &a.Source)
 	w.Bool(&a.Randomly)
@@ -342,7 +343,7 @@ type DestroyStackRequestAction struct {
 }
 
 // Marshal ...
-func (a *DestroyStackRequestAction) Marshal(w *protocol.Writer) {
+func (a *DestroyStackRequestAction) Marshal(w protocol.IO) {
 	w.Uint8(&a.Count)
 	StackReqSlotInfo(w, &a.Source)
 }
@@ -372,7 +373,7 @@ type CreateStackRequestAction struct {
 }
 
 // Marshal ...
-func (a *CreateStackRequestAction) Marshal(w *protocol.Writer) {
+func (a *CreateStackRequestAction) Marshal(w protocol.IO) {
 	w.Uint8(&a.ResultsSlot)
 }
 
@@ -385,7 +386,7 @@ func (a *CreateStackRequestAction) Unmarshal(r *protocol.Reader) {
 type LabTableCombineStackRequestAction struct{}
 
 // Marshal ...
-func (a *LabTableCombineStackRequestAction) Marshal(*protocol.Writer) {}
+func (a *LabTableCombineStackRequestAction) Marshal(protocol.IO) {}
 
 // Unmarshal ...
 func (a *LabTableCombineStackRequestAction) Unmarshal(*protocol.Reader) {}
@@ -398,7 +399,7 @@ type BeaconPaymentStackRequestAction struct {
 }
 
 // Marshal ...
-func (a *BeaconPaymentStackRequestAction) Marshal(w *protocol.Writer) {
+func (a *BeaconPaymentStackRequestAction) Marshal(w protocol.IO) {
 	w.Varint32(&a.PrimaryEffect)
 	w.Varint32(&a.SecondaryEffect)
 }
@@ -421,7 +422,7 @@ type CraftRecipeStackRequestAction struct {
 }
 
 // Marshal ...
-func (a *CraftRecipeStackRequestAction) Marshal(w *protocol.Writer) {
+func (a *CraftRecipeStackRequestAction) Marshal(w protocol.IO) {
 	w.Varuint32(&a.RecipeNetworkID)
 }
 
@@ -445,7 +446,7 @@ type CraftCreativeStackRequestAction struct {
 }
 
 // Marshal ...
-func (a *CraftCreativeStackRequestAction) Marshal(w *protocol.Writer) {
+func (a *CraftCreativeStackRequestAction) Marshal(w protocol.IO) {
 	w.Varuint32(&a.CreativeItemNetworkID)
 }
 
@@ -459,7 +460,7 @@ func (a *CraftCreativeStackRequestAction) Unmarshal(r *protocol.Reader) {
 type CraftNonImplementedStackRequestAction struct{}
 
 // Marshal ...
-func (*CraftNonImplementedStackRequestAction) Marshal(*protocol.Writer) {}
+func (*CraftNonImplementedStackRequestAction) Marshal(protocol.IO) {}
 
 // Unmarshal ...
 func (*CraftNonImplementedStackRequestAction) Unmarshal(*protocol.Reader) {}
@@ -474,7 +475,7 @@ type CraftResultsDeprecatedStackRequestAction struct {
 }
 
 // Marshal ...
-func (a *CraftResultsDeprecatedStackRequestAction) Marshal(w *protocol.Writer) {
+func (a *CraftResultsDeprecatedStackRequestAction) Marshal(w protocol.IO) {
 	l := uint32(len(a.ResultItems))
 	w.Varuint32(&l)
 	for _, i := range a.ResultItems {

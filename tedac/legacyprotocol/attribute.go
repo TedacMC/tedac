@@ -37,7 +37,7 @@ func Attributes(r *protocol.Reader, x *[]Attribute) {
 }
 
 // WriteAttributes writes a slice of Attributes x to Writer w.
-func WriteAttributes(w *protocol.Writer, x *[]Attribute) {
+func WriteAttributes(w protocol.IO, x *[]Attribute) {
 	l := uint32(len(*x))
 	w.Varuint32(&l)
 	for _, attribute := range *x {
@@ -66,7 +66,7 @@ func InitialAttributes(r *protocol.Reader, x *[]Attribute) {
 
 // WriteInitialAttributes writes a slice of Attributes x to Writer w. WriteInitialAttributes is used when
 // writing the attributes of a new entity. (AddEntity packet)
-func WriteInitialAttributes(w *protocol.Writer, x *[]Attribute) {
+func WriteInitialAttributes(w protocol.IO, x *[]Attribute) {
 	l := uint32(len(*x))
 	w.Varuint32(&l)
 	for _, attribute := range *x {

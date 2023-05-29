@@ -1,10 +1,10 @@
 package legacypacket
 
 import (
+	"image/color"
+
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"image/color"
-	"math"
 )
 
 const (
@@ -77,7 +77,7 @@ func (*ClientBoundMapItemData) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *ClientBoundMapItemData) Marshal(w *protocol.Writer) {
+func (pk *ClientBoundMapItemData) Marshal(w protocol.IO) {
 	w.Varint64(&pk.MapID)
 	w.Varuint32(&pk.UpdateFlags)
 	w.Uint8(&pk.Dimension)
@@ -128,57 +128,6 @@ func (pk *ClientBoundMapItemData) Marshal(w *protocol.Writer) {
 			}
 			for x := int32(0); x < pk.Width; x++ {
 				w.VarRGBA(&pk.Pixels[y][x])
-			}
-		}
-	}
-}
-
-// Unmarshal ...
-func (pk *ClientBoundMapItemData) Unmarshal(r *protocol.Reader) {
-	r.Varint64(&pk.MapID)
-	r.Varuint32(&pk.UpdateFlags)
-	r.Uint8(&pk.Dimension)
-	r.Bool(&pk.LockedMap)
-
-	var count uint32
-	if pk.UpdateFlags&MapUpdateFlagInitialisation != 0 {
-		r.Varuint32(&count)
-		pk.MapsIncludedIn = make([]int64, count)
-		for i := uint32(0); i < count; i++ {
-			r.Varint64(&pk.MapsIncludedIn[i])
-		}
-	}
-	if pk.UpdateFlags&(MapUpdateFlagInitialisation|MapUpdateFlagDecoration|MapUpdateFlagTexture) != 0 {
-		r.Uint8(&pk.Scale)
-	}
-	if pk.UpdateFlags&MapUpdateFlagDecoration != 0 {
-		r.Varuint32(&count)
-		pk.TrackedObjects = make([]protocol.MapTrackedObject, count)
-		for i := uint32(0); i < count; i++ {
-			pk.TrackedObjects[i].Marshal(r)
-		}
-		r.Varuint32(&count)
-		pk.Decorations = make([]protocol.MapDecoration, count)
-		for i := uint32(0); i < count; i++ {
-			pk.Decorations[i].Marshal(r)
-		}
-	}
-	if pk.UpdateFlags&MapUpdateFlagTexture != 0 {
-		r.Varint32(&pk.Width)
-		r.Varint32(&pk.Height)
-		r.Varint32(&pk.XOffset)
-		r.Varint32(&pk.YOffset)
-		r.Varuint32(&count)
-
-		r.LimitInt32(pk.Width, 0, math.MaxInt16)
-		r.LimitInt32(pk.Height, 0, math.MaxInt16)
-		r.LimitInt32(pk.Width*pk.Height, int32(count), int32(count))
-
-		pk.Pixels = make([][]color.RGBA, pk.Height)
-		for y := int32(0); y < pk.Height; y++ {
-			pk.Pixels[y] = make([]color.RGBA, pk.Width)
-			for x := int32(0); x < pk.Width; x++ {
-				r.VarRGBA(&pk.Pixels[y][x])
 			}
 		}
 	}

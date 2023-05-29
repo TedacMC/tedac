@@ -22,17 +22,9 @@ func (*CreativeContent) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *CreativeContent) Marshal(w *protocol.Writer) {
+func (pk *CreativeContent) Marshal(w protocol.IO) {
 	protocol.FuncSlice(w, &pk.Items, func(creative *legacyprotocol.CreativeItem) {
 		w.Varuint32(&creative.CreativeItemNetworkID)
 		legacyprotocol.WriteItem(w, &creative.Item)
-	})
-}
-
-// Unmarshal ...
-func (pk *CreativeContent) Unmarshal(r *protocol.Reader) {
-	protocol.FuncSlice(r, &pk.Items, func(creative *legacyprotocol.CreativeItem) {
-		r.Varuint32(&creative.CreativeItemNetworkID)
-		legacyprotocol.Item(r, &creative.Item)
 	})
 }

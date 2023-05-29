@@ -2,6 +2,7 @@ package legacyprotocol
 
 import (
 	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
@@ -73,7 +74,7 @@ const (
 // are available server-side.
 type Recipe interface {
 	// Marshal encodes the recipe data to its binary representation into buf.
-	Marshal(w *protocol.Writer)
+	Marshal(w protocol.IO)
 	// Unmarshal decodes a serialised recipe from Reader r into the recipe instance.
 	Unmarshal(r *protocol.Reader)
 }
@@ -190,7 +191,7 @@ type MultiRecipe struct {
 }
 
 // Marshal ...
-func (recipe *ShapelessRecipe) Marshal(w *protocol.Writer) {
+func (recipe *ShapelessRecipe) Marshal(w protocol.IO) {
 	marshalShapeless(w, recipe)
 }
 
@@ -200,7 +201,7 @@ func (recipe *ShapelessRecipe) Unmarshal(r *protocol.Reader) {
 }
 
 // Marshal ...
-func (recipe *ShulkerBoxRecipe) Marshal(w *protocol.Writer) {
+func (recipe *ShulkerBoxRecipe) Marshal(w protocol.IO) {
 	marshalShapeless(w, &recipe.ShapelessRecipe)
 }
 
@@ -210,7 +211,7 @@ func (recipe *ShulkerBoxRecipe) Unmarshal(r *protocol.Reader) {
 }
 
 // Marshal ...
-func (recipe *ShapelessChemistryRecipe) Marshal(w *protocol.Writer) {
+func (recipe *ShapelessChemistryRecipe) Marshal(w protocol.IO) {
 	marshalShapeless(w, &recipe.ShapelessRecipe)
 }
 
@@ -220,7 +221,7 @@ func (recipe *ShapelessChemistryRecipe) Unmarshal(r *protocol.Reader) {
 }
 
 // Marshal ...
-func (recipe *ShapedRecipe) Marshal(w *protocol.Writer) {
+func (recipe *ShapedRecipe) Marshal(w protocol.IO) {
 	marshalShaped(w, recipe)
 }
 
@@ -230,7 +231,7 @@ func (recipe *ShapedRecipe) Unmarshal(r *protocol.Reader) {
 }
 
 // Marshal ...
-func (recipe *ShapedChemistryRecipe) Marshal(w *protocol.Writer) {
+func (recipe *ShapedChemistryRecipe) Marshal(w protocol.IO) {
 	marshalShaped(w, &recipe.ShapedRecipe)
 }
 
@@ -240,7 +241,7 @@ func (recipe *ShapedChemistryRecipe) Unmarshal(r *protocol.Reader) {
 }
 
 // Marshal ...
-func (recipe *FurnaceRecipe) Marshal(w *protocol.Writer) {
+func (recipe *FurnaceRecipe) Marshal(w protocol.IO) {
 	w.Varint32(&recipe.InputType.NetworkID)
 	WriteItem(w, &recipe.Output)
 	w.String(&recipe.Block)
@@ -254,7 +255,7 @@ func (recipe *FurnaceRecipe) Unmarshal(r *protocol.Reader) {
 }
 
 // Marshal ...
-func (recipe *FurnaceDataRecipe) Marshal(w *protocol.Writer) {
+func (recipe *FurnaceDataRecipe) Marshal(w protocol.IO) {
 	w.Varint32(&recipe.InputType.NetworkID)
 	aux := int32(recipe.InputType.MetadataValue)
 	w.Varint32(&aux)
@@ -274,7 +275,7 @@ func (recipe *FurnaceDataRecipe) Unmarshal(r *protocol.Reader) {
 }
 
 // Marshal ...
-func (recipe *MultiRecipe) Marshal(w *protocol.Writer) {
+func (recipe *MultiRecipe) Marshal(w protocol.IO) {
 	w.UUID(&recipe.UUID)
 	w.Varuint32(&recipe.RecipeNetworkID)
 }
@@ -286,7 +287,7 @@ func (recipe *MultiRecipe) Unmarshal(r *protocol.Reader) {
 }
 
 // marshalShaped ...
-func marshalShaped(w *protocol.Writer, recipe *ShapedRecipe) {
+func marshalShaped(w protocol.IO, recipe *ShapedRecipe) {
 	w.String(&recipe.RecipeID)
 	w.Varint32(&recipe.Width)
 	w.Varint32(&recipe.Height)
@@ -338,7 +339,7 @@ func unmarshalShaped(r *protocol.Reader, recipe *ShapedRecipe) {
 }
 
 // marshalShapeless ...
-func marshalShapeless(w *protocol.Writer, recipe *ShapelessRecipe) {
+func marshalShapeless(w protocol.IO, recipe *ShapelessRecipe) {
 	inputLen, outputLen := uint32(len(recipe.Input)), uint32(len(recipe.Output))
 	w.String(&recipe.RecipeID)
 	w.Varuint32(&inputLen)

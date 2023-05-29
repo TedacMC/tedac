@@ -26,7 +26,7 @@ func (*AvailableCommands) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *AvailableCommands) Marshal(w *protocol.Writer) {
+func (pk *AvailableCommands) Marshal(w protocol.IO) {
 	values, valueIndices := pk.enumValues()
 	suffixes, suffixIndices := pk.suffixes()
 	enums, enumIndices := pk.enums()
@@ -76,75 +76,9 @@ func (pk *AvailableCommands) Marshal(w *protocol.Writer) {
 	}
 }
 
-// Unmarshal ...
-func (pk *AvailableCommands) Unmarshal(r *protocol.Reader) {
-	var count uint32
-
-	// First we read all the enum values and suffixes.
-	var enumValues, suffixes []string
-	protocol.FuncSlice(r, &enumValues, r.String)
-	protocol.FuncSlice(r, &suffixes, r.String)
-
-	// After that we create all enums, which are composed of pointers to the enum values above.
-	r.Varuint32(&count)
-	enums := make([]legacyprotocol.CommandEnum, count)
-	var optionCount uint32
-	for i := uint32(0); i < count; i++ {
-		r.String(&enums[i].Type)
-		r.Varuint32(&optionCount)
-		enums[i].Options = make([]string, optionCount)
-		for j := uint32(0); j < optionCount; j++ {
-			enumOption(r, &enums[i].Options[j], enumValues)
-		}
-	}
-
-	// We read all the commands, which will have their enums and suffixes set automatically. We don't yet set
-	// the dynamic enums as we haven't read them yet.
-	r.Varuint32(&count)
-	pk.Commands = make([]legacyprotocol.Command, count)
-	for i := uint32(0); i < count; i++ {
-		legacyprotocol.CommandData(r, &pk.Commands[i], enums, suffixes)
-	}
-
-	// We first read all soft enums of the packet.
-	r.Varuint32(&count)
-	softEnums := make([]legacyprotocol.CommandEnum, count)
-	for i := uint32(0); i < count; i++ {
-		softEnums[i].Dynamic = true
-		r.String(&softEnums[i].Type)
-
-		var optionCount uint32
-		r.Varuint32(&optionCount)
-		softEnums[i].Options = make([]string, optionCount)
-		for j := uint32(0); j < optionCount; j++ {
-			r.String(&softEnums[i].Options[j])
-		}
-	}
-
-	// After we've read all soft enums, we need to match them with the values that are set in the commands
-	// that we read before.
-	for i, command := range pk.Commands {
-		for j, overload := range command.Overloads {
-			for k, param := range overload.Parameters {
-				if param.Type&protocol.CommandArgSoftEnum != 0 {
-					offset := param.Type & 0xffff
-					r.LimitUint32(offset, uint32(len(softEnums))-1)
-					pk.Commands[i].Overloads[j].Parameters[k].Enum = softEnums[offset]
-				}
-			}
-		}
-	}
-
-	r.Varuint32(&count)
-	pk.Constraints = make([]legacyprotocol.CommandEnumConstraint, count)
-	for i := uint32(0); i < count; i++ {
-		legacyprotocol.EnumConstraint(r, &pk.Constraints[i], enums, enumValues)
-	}
-}
-
 // writeEnumOption writes an enum option to w using the value indices passed. It is written as a
 // byte/uint16/uint32 depending on the size of the value indices map.
-func writeEnumOption(w *protocol.Writer, option string, valueIndices map[string]int) {
+func writeEnumOption(w protocol.IO, option string, valueIndices map[string]int) {
 	l := len(valueIndices)
 	switch {
 	case l <= math.MaxUint8:

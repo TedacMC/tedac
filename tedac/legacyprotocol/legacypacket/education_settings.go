@@ -28,19 +28,10 @@ func (*EducationSettings) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *EducationSettings) Marshal(w *protocol.Writer) {
+func (pk *EducationSettings) Marshal(w protocol.IO) {
 	w.String(&pk.CodeBuilderDefaultURI)
 	w.String(&pk.CodeBuilderTitle)
 	w.Bool(&pk.CanResizeCodeBuilder)
 	protocol.OptionalFunc(w, &pk.OverrideURI, w.String)
 	w.Bool(&pk.HasQuiz)
-}
-
-// Unmarshal ...
-func (pk *EducationSettings) Unmarshal(r *protocol.Reader) {
-	r.String(&pk.CodeBuilderDefaultURI)
-	r.String(&pk.CodeBuilderTitle)
-	r.Bool(&pk.CanResizeCodeBuilder)
-	protocol.OptionalFunc(r, &pk.OverrideURI, r.String)
-	r.Bool(&pk.HasQuiz)
 }

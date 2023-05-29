@@ -22,22 +22,10 @@ func (*ItemStackRequest) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *ItemStackRequest) Marshal(w *protocol.Writer) {
+func (pk *ItemStackRequest) Marshal(w protocol.IO) {
 	l := uint32(len(pk.Requests))
 	w.Varuint32(&l)
 	for _, req := range pk.Requests {
 		legacyprotocol.WriteStackRequest(w, &req)
-	}
-}
-
-// Unmarshal ...
-func (pk *ItemStackRequest) Unmarshal(r *protocol.Reader) {
-	var count uint32
-	r.Varuint32(&count)
-	r.LimitUint32(count, 64)
-
-	pk.Requests = make([]legacyprotocol.ItemStackRequest, count)
-	for i := uint32(0); i < count; i++ {
-		legacyprotocol.StackRequest(r, &pk.Requests[i])
 	}
 }

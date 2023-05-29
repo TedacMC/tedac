@@ -63,7 +63,7 @@ func (*PlayerList) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *PlayerList) Marshal(w *protocol.Writer) {
+func (pk *PlayerList) Marshal(w protocol.IO) {
 	l := uint32(len(pk.Entries))
 	w.Uint8(&pk.ActionType)
 	w.Varuint32(&l)
@@ -88,37 +88,6 @@ func (pk *PlayerList) Marshal(w *protocol.Writer) {
 	if pk.ActionType == PlayerListActionAdd {
 		for _, entry := range pk.Entries {
 			w.Bool(&entry.Skin.Trusted)
-		}
-	}
-}
-
-// Unmarshal ...
-func (pk *PlayerList) Unmarshal(r *protocol.Reader) {
-	var count uint32
-	r.Uint8(&pk.ActionType)
-	r.Varuint32(&count)
-	pk.Entries = make([]PlayerListEntry, count)
-	for i := uint32(0); i < count; i++ {
-		switch pk.ActionType {
-		case PlayerListActionAdd:
-			r.UUID(&pk.Entries[i].UUID)
-			r.Varint64(&pk.Entries[i].EntityUniqueID)
-			r.String(&pk.Entries[i].Username)
-			r.String(&pk.Entries[i].XUID)
-			r.String(&pk.Entries[i].PlatformChatID)
-			r.Int32(&pk.Entries[i].BuildPlatform)
-			legacyprotocol.SerialisedSkin(r, &pk.Entries[i].Skin)
-			r.Bool(&pk.Entries[i].Teacher)
-			r.Bool(&pk.Entries[i].Host)
-		case PlayerListActionRemove:
-			r.UUID(&pk.Entries[i].UUID)
-		default:
-			panic("unknown player list action type")
-		}
-	}
-	if pk.ActionType == PlayerListActionAdd {
-		for i := uint32(0); i < count; i++ {
-			r.Bool(&pk.Entries[i].Skin.Trusted)
 		}
 	}
 }

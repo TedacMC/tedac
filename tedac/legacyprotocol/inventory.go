@@ -46,7 +46,7 @@ type InventoryAction struct {
 }
 
 // Marshal encodes an InventoryAction.
-func (x *InventoryAction) Marshal(w *protocol.Writer, netIDs bool) {
+func (x *InventoryAction) Marshal(w protocol.IO, netIDs bool) {
 	w.Varuint32(&x.SourceType)
 	switch x.SourceType {
 	case InventoryActionSourceContainer, InventoryActionSourceTODO:
@@ -83,7 +83,7 @@ func (x *InventoryAction) Unmarshal(r *protocol.Reader, netIDs bool) {
 // The data it holds depends on the type.
 type InventoryTransactionData interface {
 	// Marshal encodes a serialised inventory transaction data object.
-	Marshal(w *protocol.Writer)
+	Marshal(w protocol.IO)
 	// Unmarshal decodes a serialised inventory transaction data object.
 	Unmarshal(r *protocol.Reader)
 }
@@ -180,7 +180,7 @@ type ReleaseItemTransactionData struct {
 }
 
 // Marshal ...
-func (data *UseItemTransactionData) Marshal(w *protocol.Writer) {
+func (data *UseItemTransactionData) Marshal(w protocol.IO) {
 	w.Varuint32(&data.ActionType)
 	w.UBlockPos(&data.BlockPosition)
 	w.Varint32(&data.BlockFace)
@@ -204,7 +204,7 @@ func (data *UseItemTransactionData) Unmarshal(r *protocol.Reader) {
 }
 
 // Marshal ...
-func (data *UseItemOnEntityTransactionData) Marshal(w *protocol.Writer) {
+func (data *UseItemOnEntityTransactionData) Marshal(w protocol.IO) {
 	w.Varuint64(&data.TargetEntityRuntimeID)
 	w.Varuint32(&data.ActionType)
 	w.Varint32(&data.HotBarSlot)
@@ -224,7 +224,7 @@ func (data *UseItemOnEntityTransactionData) Unmarshal(r *protocol.Reader) {
 }
 
 // Marshal ...
-func (data *ReleaseItemTransactionData) Marshal(w *protocol.Writer) {
+func (data *ReleaseItemTransactionData) Marshal(w protocol.IO) {
 	w.Varuint32(&data.ActionType)
 	w.Varint32(&data.HotBarSlot)
 	WriteItem(w, &data.HeldItem)
@@ -240,13 +240,13 @@ func (data *ReleaseItemTransactionData) Unmarshal(r *protocol.Reader) {
 }
 
 // Marshal ...
-func (*NormalTransactionData) Marshal(*protocol.Writer) {}
+func (*NormalTransactionData) Marshal(protocol.IO) {}
 
 // Unmarshal ...
 func (*NormalTransactionData) Unmarshal(*protocol.Reader) {}
 
 // Marshal ...
-func (*MismatchTransactionData) Marshal(*protocol.Writer) {}
+func (*MismatchTransactionData) Marshal(protocol.IO) {}
 
 // Unmarshal ...
 func (*MismatchTransactionData) Unmarshal(*protocol.Reader) {}

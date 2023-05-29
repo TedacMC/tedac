@@ -20,11 +20,6 @@ func (*NetworkSettings) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *NetworkSettings) Marshal(w *protocol.Writer) {
+func (pk *NetworkSettings) Marshal(w protocol.IO) {
 	w.Uint16(&pk.CompressionThreshold)
-}
-
-// Unmarshal ...
-func (pk *NetworkSettings) Unmarshal(r *protocol.Reader) {
-	r.Uint16(&pk.CompressionThreshold)
 }
