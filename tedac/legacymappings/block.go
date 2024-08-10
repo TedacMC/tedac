@@ -33,7 +33,7 @@ func init() {
 		panic(err)
 	}
 
-	buf := protocol.NewReader(bytes.NewBuffer(blockStateMap), 0)
+	buf := protocol.NewReader(bytes.NewBuffer(blockStateMap), 0, false)
 	var length uint32
 	buf.Varuint32(&length)
 	for i := uint32(0); i < length; i++ {

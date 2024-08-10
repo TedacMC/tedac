@@ -1,3 +1,4 @@
+.idea/
 /token.tok
 build/bin
 node_modules

@@ -32,8 +32,11 @@ func (Protocol) Ver() string {
 }
 
 // Packets ...
-func (Protocol) Packets() packet.Pool {
-	pool := packet.NewPool()
+func (Protocol) Packets(bool) packet.Pool {
+	pool := packet.NewClientPool()
+	for k, v := range packet.NewServerPool() {
+		pool[k] = v
+	}
 	pool[packet.IDCommandRequest] = func() packet.Packet { return &legacypacket.CommandRequest{} }
 	pool[packet.IDContainerClose] = func() packet.Packet { return &legacypacket.ContainerClose{} }
 	pool[packet.IDInventoryTransaction] = func() packet.Packet { return &legacypacket.InventoryTransaction{} }
@@ -41,7 +44,20 @@ func (Protocol) Packets() packet.Pool {
 	pool[packet.IDModalFormResponse] = func() packet.Packet { return &legacypacket.ModalFormResponse{} }
 	pool[packet.IDMovePlayer] = func() packet.Packet { return &legacypacket.MovePlayer{} }
 	pool[packet.IDPlayerAction] = func() packet.Packet { return &legacypacket.PlayerAction{} }
+	pool[packet.IDDisconnect] = func() packet.Packet { return &legacypacket.Disconnect{} }
+	pool[packet.IDRequestChunkRadius] = func() packet.Packet { return &legacypacket.RequestChunkRadius{} }
+	pool[packet.IDText] = func() packet.Packet { return &legacypacket.Text{} }
 	return pool
+}
+
+// NewReader ...
+func (Protocol) NewReader(r minecraft.ByteReader, shieldID int32, enableLimits bool) protocol.IO {
+	return protocol.NewReader(r, shieldID, enableLimits)
+}
+
+// NewWriter ...
+func (Protocol) NewWriter(w minecraft.ByteWriter, shieldID int32) protocol.IO {
+	return protocol.NewWriter(w, shieldID)
 }
 
 // Encryption ...
@@ -54,8 +70,33 @@ var nullBytes = []byte("null\n")
 
 // ConvertToLatest ...
 func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
-	//fmt.Printf("1.12 -> 1.19.30: %T\n", pk)
+	// fmt.Printf("1.12 -> Latest: %T\n", pk)
 	switch pk := pk.(type) {
+	case *legacypacket.Disconnect:
+		return []packet.Packet{
+			&packet.Disconnect{
+				HideDisconnectionScreen: pk.HideDisconnectionScreen,
+				Message:                 pk.Message,
+			},
+		}
+	case *legacypacket.RequestChunkRadius:
+		return []packet.Packet{
+			&packet.RequestChunkRadius{
+				ChunkRadius: pk.ChunkRadius,
+			},
+		}
+	case *legacypacket.Text:
+		return []packet.Packet{
+			&packet.Text{
+				TextType:         pk.TextType,
+				NeedsTranslation: pk.NeedsTranslation,
+				SourceName:       pk.SourceName,
+				Message:          pk.Message,
+				Parameters:       pk.Parameters,
+				XUID:             pk.XUID,
+				PlatformChatID:   pk.PlatformChatID,
+			},
+		}
 	case *legacypacket.MovePlayer:
 		return []packet.Packet{
 			&packet.MovePlayer{
@@ -188,8 +229,37 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 
 // ConvertFromLatest ...
 func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []packet.Packet {
-	//fmt.Printf("1.19.30 -> 1.12: %T\n", pk)
+	// fmt.Printf("Latest -> 1.12: %T\n", pk)
 	switch pk := pk.(type) {
+	case *packet.RequestNetworkSettings:
+		return []packet.Packet{
+			&packet.RequestNetworkSettings{ClientProtocol: protocol.CurrentProtocol},
+		}
+	case *packet.Text:
+		return []packet.Packet{
+			&legacypacket.Text{
+				TextType:         pk.TextType,
+				NeedsTranslation: pk.NeedsTranslation,
+				SourceName:       pk.SourceName,
+				Message:          pk.Message,
+				Parameters:       pk.Parameters,
+				XUID:             pk.XUID,
+				PlatformChatID:   pk.PlatformChatID,
+			},
+		}
+	case *packet.Disconnect:
+		return []packet.Packet{
+			&legacypacket.Disconnect{
+				HideDisconnectionScreen: pk.HideDisconnectionScreen,
+				Message:                 pk.Message,
+			},
+		}
+	case *packet.RequestChunkRadius:
+		return []packet.Packet{
+			&legacypacket.RequestChunkRadius{
+				ChunkRadius: pk.ChunkRadius,
+			},
+		}
 	case *packet.StartGame:
 		// TODO: Adjust our mappings to account for any possible custom blocks.
 		return []packet.Packet{
@@ -579,7 +649,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 						Description:     c.Description,
 						Flags:           byte(c.Flags),
 						PermissionLevel: c.PermissionLevel,
-						Aliases:         c.Aliases,
+						//Aliases:         c.Aliases,
 						Overloads: lo.Map(c.Overloads, func(o protocol.CommandOverload, i int) legacyprotocol.CommandOverload {
 							return legacyprotocol.CommandOverload{Parameters: lo.Map(o.Parameters, func(p protocol.CommandParameter, _ int) legacyprotocol.CommandParameter {
 								return legacyprotocol.CommandParameter{
@@ -587,8 +657,8 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 									Type:                p.Type,
 									Optional:            p.Optional,
 									CollapseEnumOptions: true,
-									Enum:                legacyprotocol.CommandEnum(p.Enum),
-									Suffix:              p.Suffix,
+									//Enum:                legacyprotocol.CommandEnum(p.Enum),
+									//Suffix:              p.Suffix,
 								}
 							})}
 						}),
@@ -661,7 +731,7 @@ func downgradeItem(input protocol.ItemStack) legacyprotocol.ItemStack {
 	}
 }
 
-// upgradeItem upgrades the input item stack to a v1.19.0 item stack. It returns a boolean indicating if the item was
+// upgradeItem upgrades the input item stack to the latest item stack. It returns a boolean indicating if the item was
 // upgraded successfully.
 func upgradeItem(input legacyprotocol.ItemStack) protocol.ItemStack {
 	if input.ItemType.NetworkID == 0 {
@@ -681,7 +751,7 @@ func upgradeItem(input legacyprotocol.ItemStack) protocol.ItemStack {
 	}
 }
 
-// downgradeBlockRuntimeID downgrades a v1.19.0 block runtime ID to a v1.12.0 block runtime ID.
+// downgradeBlockRuntimeID downgrades the latest block runtime ID to a v1.12.0 block runtime ID.
 func downgradeBlockRuntimeID(input uint32) uint32 {
 	name, properties, ok := latestmappings.RuntimeIDToState(input)
 	if !ok {
@@ -690,7 +760,7 @@ func downgradeBlockRuntimeID(input uint32) uint32 {
 	return legacymappings.StateToRuntimeID(name, properties)
 }
 
-// upgradeBlockRuntimeID upgrades a v1.12.0 block runtime ID to a v1.19.0 block runtime ID.
+// upgradeBlockRuntimeID upgrades a v1.12.0 block runtime ID to the latest block runtime ID.
 func upgradeBlockRuntimeID(input uint32) uint32 {
 	name, properties, ok := legacymappings.RuntimeIDToState(input)
 	if !ok {
