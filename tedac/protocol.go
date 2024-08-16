@@ -47,6 +47,8 @@ func (Protocol) Packets(bool) packet.Pool {
 	pool[packet.IDDisconnect] = func() packet.Packet { return &legacypacket.Disconnect{} }
 	pool[packet.IDRequestChunkRadius] = func() packet.Packet { return &legacypacket.RequestChunkRadius{} }
 	pool[packet.IDText] = func() packet.Packet { return &legacypacket.Text{} }
+	pool[packet.IDStopSound] = func() packet.Packet { return &legacypacket.StopSound{} }
+	pool[packet.IDSetTitle] = func() packet.Packet { return &legacypacket.SetTitle{} }
 	return pool
 }
 
@@ -72,6 +74,23 @@ var nullBytes = []byte("null\n")
 func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
 	// fmt.Printf("1.12 -> Latest: %T\n", pk)
 	switch pk := pk.(type) {
+	case *legacypacket.SetTitle:
+		return []packet.Packet{
+			&packet.SetTitle{
+				ActionType:      pk.ActionType,
+				Text:            pk.Text,
+				FadeInDuration:  pk.FadeInDuration,
+				RemainDuration:  pk.RemainDuration,
+				FadeOutDuration: pk.FadeOutDuration,
+			},
+		}
+	case *legacypacket.StopSound:
+		return []packet.Packet{
+			&packet.StopSound{
+				SoundName: pk.SoundName,
+				StopAll:   pk.StopAll,
+			},
+		}
 	case *legacypacket.Disconnect:
 		return []packet.Packet{
 			&packet.Disconnect{
@@ -234,6 +253,23 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 	case *packet.RequestNetworkSettings:
 		return []packet.Packet{
 			&packet.RequestNetworkSettings{ClientProtocol: protocol.CurrentProtocol},
+		}
+	case *packet.SetTitle:
+		return []packet.Packet{
+			&legacypacket.SetTitle{
+				ActionType:      pk.ActionType,
+				Text:            pk.Text,
+				FadeInDuration:  pk.FadeInDuration,
+				RemainDuration:  pk.RemainDuration,
+				FadeOutDuration: pk.FadeOutDuration,
+			},
+		}
+	case *packet.StopSound:
+		return []packet.Packet{
+			&legacypacket.StopSound{
+				SoundName: pk.SoundName,
+				StopAll:   pk.StopAll,
+			},
 		}
 	case *packet.Text:
 		return []packet.Packet{
