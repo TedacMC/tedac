@@ -34,25 +34,46 @@ func (Protocol) Ver() string {
 }
 
 // Packets ...
-func (Protocol) Packets() packet.Pool {
-	pool := packet.NewPool()
+func (Protocol) Packets(bool) packet.Pool {
+	pool := packet.NewClientPool()
+	for k, v := range packet.NewServerPool() {
+		pool[k] = v
+	}
 	pool[packet.IDActorPickRequest] = func() packet.Packet { return &legacypacket.ActorPickRequest{} }
 	pool[packet.IDCommandRequest] = func() packet.Packet { return &legacypacket.CommandRequest{} }
-	pool[packet.IDCraftingEvent] = func() packet.Packet { return &legacypacket.CraftingEvent{} }
+	pool[packet.IDContainerClose] = func() packet.Packet { return &legacypacket.ContainerClose{} }
+	// pool[packet.IDCraftingEvent] = func() packet.Packet { return &legacypacket.CraftingEvent{} }
 	pool[packet.IDInventoryTransaction] = func() packet.Packet { return &legacypacket.InventoryTransaction{} }
 	pool[packet.IDItemStackRequest] = func() packet.Packet { return &legacypacket.ItemStackRequest{} }
+	pool[packet.IDItemStackResponse] = func() packet.Packet { return &legacypacket.ItemStackResponse{} }
 	pool[packet.IDMapInfoRequest] = func() packet.Packet { return &legacypacket.MapInfoRequest{} }
 	pool[packet.IDMobArmourEquipment] = func() packet.Packet { return &legacypacket.MobArmourEquipment{} }
+	pool[packet.IDMobEffect] = func() packet.Packet { return &legacypacket.MobEffect{} }
 	pool[packet.IDMobEquipment] = func() packet.Packet { return &legacypacket.MobEquipment{} }
 	pool[packet.IDModalFormResponse] = func() packet.Packet { return &legacypacket.ModalFormResponse{} }
 	pool[packet.IDNPCRequest] = func() packet.Packet { return &legacypacket.NPCRequest{} }
 	pool[packet.IDPlayerAction] = func() packet.Packet { return &legacypacket.PlayerAction{} }
 	pool[packet.IDPlayerAuthInput] = func() packet.Packet { return &legacypacket.PlayerAuthInput{} }
 	pool[packet.IDPlayerSkin] = func() packet.Packet { return &legacypacket.PlayerSkin{} }
+	pool[packet.IDResourcePacksInfo] = func() packet.Packet { return &legacypacket.ResourcePacksInfo{} }
+	pool[packet.IDResourcePackStack] = func() packet.Packet { return &legacypacket.ResourcePackStack{} }
+	pool[packet.IDRequestChunkRadius] = func() packet.Packet { return &legacypacket.RequestChunkRadius{} }
 	pool[packet.IDSetActorData] = func() packet.Packet { return &legacypacket.SetActorData{} }
+	pool[packet.IDSetActorMotion] = func() packet.Packet { return &legacypacket.SetActorMotion{} }
 	pool[packet.IDStructureBlockUpdate] = func() packet.Packet { return &legacypacket.StructureBlockUpdate{} }
 	pool[packet.IDStructureTemplateDataRequest] = func() packet.Packet { return &legacypacket.StructureTemplateDataRequest{} }
+	pool[packet.IDText] = func() packet.Packet { return &legacypacket.Text{} }
 	return pool
+}
+
+// NewReader ...
+func (Protocol) NewReader(r minecraft.ByteReader, shieldID int32, enableLimits bool) protocol.IO {
+	return protocol.NewReader(r, shieldID, enableLimits)
+}
+
+// NewWriter ...
+func (Protocol) NewWriter(w minecraft.ByteWriter, shieldID int32) protocol.IO {
+	return protocol.NewWriter(w, shieldID)
 }
 
 // Encryption ...
@@ -65,7 +86,7 @@ var nullBytes = []byte("null\n")
 
 // ConvertToLatest ...
 func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
-	fmt.Printf("1.16.100 -> 1.19.8x: %T\n", pk)
+	// fmt.Printf("1.16.100 -> Latest: %T\n", pk)
 	switch pk := pk.(type) {
 	case *legacypacket.ActorPickRequest:
 		return []packet.Packet{
@@ -82,18 +103,32 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				Internal:      pk.Internal,
 			},
 		}
-	case *legacypacket.CraftingEvent:
+	case *legacypacket.ContainerClose:
 		return []packet.Packet{
-			&packet.CraftingEvent{
-				WindowID:     pk.WindowID,
-				CraftingType: pk.CraftingType,
-				RecipeUUID:   pk.RecipeUUID,
-				Input: lo.Map(pk.Input, func(stack legacyprotocol.ItemStack, _ int) protocol.ItemInstance {
-					return protocol.ItemInstance{Stack: upgradeItem(stack)}
-				}),
-				Output: lo.Map(pk.Output, func(stack legacyprotocol.ItemStack, _ int) protocol.ItemInstance {
-					return protocol.ItemInstance{Stack: upgradeItem(stack)}
-				}),
+			&packet.ContainerClose{
+				WindowID:   pk.WindowID,
+				ServerSide: pk.ServerSide,
+			},
+		}
+	//case *legacypacket.CraftingEvent:
+	//	return []packet.Packet{
+	//		&packet.CraftingEvent{
+	//			WindowID:     pk.WindowID,
+	//			CraftingType: pk.CraftingType,
+	//			RecipeUUID:   pk.RecipeUUID,
+	//			Input: lo.Map(pk.Input, func(stack legacyprotocol.ItemStack, _ int) protocol.ItemInstance {
+	//				return protocol.ItemInstance{Stack: upgradeItem(stack)}
+	//			}),
+	//			Output: lo.Map(pk.Output, func(stack legacyprotocol.ItemStack, _ int) protocol.ItemInstance {
+	//				return protocol.ItemInstance{Stack: upgradeItem(stack)}
+	//			}),
+	//		},
+	//	}
+	case *legacypacket.Disconnect:
+		return []packet.Packet{
+			&packet.Disconnect{
+				HideDisconnectionScreen: pk.HideDisconnectionScreen,
+				Message:                 pk.Message,
 			},
 		}
 	case *legacypacket.InventoryTransaction:
@@ -165,12 +200,12 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 								newAction := &protocol.TakeStackRequestAction{}
 								newAction.Count = data.Count
 								newAction.Source = protocol.StackRequestSlotInfo{
-									ContainerID:    legacyprotocol.UpgradeContainerID(data.Source.ContainerID),
+									Container:      protocol.FullContainerName{ContainerID: legacyprotocol.UpgradeContainerID(data.Source.ContainerID)},
 									Slot:           data.Source.Slot,
 									StackNetworkID: data.Source.StackNetworkID,
 								}
 								newAction.Destination = protocol.StackRequestSlotInfo{
-									ContainerID:    legacyprotocol.UpgradeContainerID(data.Destination.ContainerID),
+									Container:      protocol.FullContainerName{ContainerID: legacyprotocol.UpgradeContainerID(data.Destination.ContainerID)},
 									Slot:           data.Destination.Slot,
 									StackNetworkID: data.Destination.StackNetworkID,
 								}
@@ -179,12 +214,12 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 								newAction := &protocol.PlaceStackRequestAction{}
 								newAction.Count = data.Count
 								newAction.Source = protocol.StackRequestSlotInfo{
-									ContainerID:    legacyprotocol.UpgradeContainerID(data.Source.ContainerID),
+									Container:      protocol.FullContainerName{ContainerID: legacyprotocol.UpgradeContainerID(data.Source.ContainerID)},
 									Slot:           data.Source.Slot,
 									StackNetworkID: data.Source.StackNetworkID,
 								}
 								newAction.Destination = protocol.StackRequestSlotInfo{
-									ContainerID:    legacyprotocol.UpgradeContainerID(data.Destination.ContainerID),
+									Container:      protocol.FullContainerName{ContainerID: legacyprotocol.UpgradeContainerID(data.Destination.ContainerID)},
 									Slot:           data.Destination.Slot,
 									StackNetworkID: data.Destination.StackNetworkID,
 								}
@@ -192,12 +227,12 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 							case *legacyprotocol.SwapStackRequestAction:
 								newAction := &protocol.SwapStackRequestAction{}
 								newAction.Source = protocol.StackRequestSlotInfo{
-									ContainerID:    legacyprotocol.UpgradeContainerID(data.Source.ContainerID),
+									Container:      protocol.FullContainerName{ContainerID: legacyprotocol.UpgradeContainerID(data.Source.ContainerID)},
 									Slot:           data.Source.Slot,
 									StackNetworkID: data.Source.StackNetworkID,
 								}
 								newAction.Destination = protocol.StackRequestSlotInfo{
-									ContainerID:    legacyprotocol.UpgradeContainerID(data.Destination.ContainerID),
+									Container:      protocol.FullContainerName{ContainerID: legacyprotocol.UpgradeContainerID(data.Destination.ContainerID)},
 									Slot:           data.Destination.Slot,
 									StackNetworkID: data.Destination.StackNetworkID,
 								}
@@ -206,7 +241,7 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 								newAction := &protocol.DropStackRequestAction{}
 								newAction.Count = data.Count
 								newAction.Source = protocol.StackRequestSlotInfo{
-									ContainerID:    legacyprotocol.UpgradeContainerID(data.Source.ContainerID),
+									Container:      protocol.FullContainerName{ContainerID: legacyprotocol.UpgradeContainerID(data.Source.ContainerID)},
 									Slot:           data.Source.Slot,
 									StackNetworkID: data.Source.StackNetworkID,
 								}
@@ -216,7 +251,7 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 								newAction := &protocol.DestroyStackRequestAction{}
 								newAction.Count = data.Count
 								newAction.Source = protocol.StackRequestSlotInfo{
-									ContainerID:    legacyprotocol.UpgradeContainerID(data.Source.ContainerID),
+									Container:      protocol.FullContainerName{ContainerID: legacyprotocol.UpgradeContainerID(data.Source.ContainerID)},
 									Slot:           data.Source.Slot,
 									StackNetworkID: data.Source.StackNetworkID,
 								}
@@ -225,7 +260,7 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 								newAction := &protocol.ConsumeStackRequestAction{}
 								newAction.Count = data.Count
 								newAction.Source = protocol.StackRequestSlotInfo{
-									ContainerID:    legacyprotocol.UpgradeContainerID(data.Source.ContainerID),
+									Container:      protocol.FullContainerName{ContainerID: legacyprotocol.UpgradeContainerID(data.Source.ContainerID)},
 									Slot:           data.Source.Slot,
 									StackNetworkID: data.Source.StackNetworkID,
 								}
@@ -282,6 +317,17 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				Chestplate:      protocol.ItemInstance{Stack: upgradeItem(pk.Chestplate)},
 				Leggings:        protocol.ItemInstance{Stack: upgradeItem(pk.Leggings)},
 				Boots:           protocol.ItemInstance{Stack: upgradeItem(pk.Boots)},
+			},
+		}
+	case *legacypacket.MobEffect:
+		return []packet.Packet{
+			&packet.MobEffect{
+				EntityRuntimeID: pk.EntityRuntimeID,
+				Operation:       pk.Operation,
+				EffectType:      pk.EffectType,
+				Amplifier:       pk.Amplifier,
+				Particles:       pk.Particles,
+				Duration:        pk.Duration,
 			},
 		}
 	case *legacypacket.MobEquipment:
@@ -355,12 +401,65 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				OldSkinName: pk.OldSkinName,
 			},
 		}
+	case *legacypacket.ResourcePacksInfo:
+		return []packet.Packet{
+			&packet.ResourcePacksInfo{
+				TexturePackRequired: pk.TexturePackRequired,
+				HasScripts:          pk.HasScripts,
+				BehaviourPacks: lo.Map(pk.BehaviourPacks, func(pack legacyprotocol.ResourcePackInfo, _ int) protocol.BehaviourPackInfo {
+					return protocol.BehaviourPackInfo{
+						UUID:            pack.UUID,
+						Version:         pack.Version,
+						Size:            pack.Size,
+						ContentKey:      pack.ContentKey,
+						SubPackName:     pack.SubPackName,
+						ContentIdentity: pack.ContentIdentity,
+						HasScripts:      pack.HasScripts,
+					}
+				}),
+				TexturePacks: lo.Map(pk.TexturePacks, func(pack legacyprotocol.ResourcePackInfo, _ int) protocol.TexturePackInfo {
+					return protocol.TexturePackInfo{
+						UUID:            pack.UUID,
+						Version:         pack.Version,
+						Size:            pack.Size,
+						ContentKey:      pack.ContentKey,
+						SubPackName:     pack.SubPackName,
+						ContentIdentity: pack.ContentIdentity,
+						HasScripts:      pack.HasScripts,
+					}
+				}),
+			},
+		}
+	case *legacypacket.ResourcePackStack:
+		return []packet.Packet{
+			&packet.ResourcePackStack{
+				TexturePackRequired:          pk.TexturePackRequired,
+				BehaviourPacks:               pk.BehaviourPacks,
+				TexturePacks:                 pk.TexturePacks,
+				BaseGameVersion:              pk.BaseGameVersion,
+				Experiments:                  pk.Experiments,
+				ExperimentsPreviouslyToggled: pk.PreviouslyHadExperimentsToggled,
+			},
+		}
+	case *legacypacket.RequestChunkRadius:
+		return []packet.Packet{
+			&packet.RequestChunkRadius{
+				ChunkRadius: pk.ChunkRadius,
+			},
+		}
 	case *legacypacket.SetActorData:
 		return []packet.Packet{
 			&packet.SetActorData{
 				EntityRuntimeID: pk.EntityRuntimeID,
 				EntityMetadata:  legacyprotocol.UpgradeEntityMetadata(pk.EntityMetadata),
 				Tick:            pk.Tick,
+			},
+		}
+	case *legacypacket.SetActorMotion:
+		return []packet.Packet{
+			&packet.SetActorMotion{
+				EntityRuntimeID: pk.EntityRuntimeID,
+				Velocity:        pk.Velocity,
 			},
 		}
 	case *legacypacket.StructureBlockUpdate:
@@ -410,6 +509,18 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				RequestType: pk.RequestType,
 			},
 		}
+	case *legacypacket.Text:
+		return []packet.Packet{
+			&packet.Text{
+				TextType:         pk.TextType,
+				NeedsTranslation: pk.NeedsTranslation,
+				SourceName:       pk.SourceName,
+				Message:          pk.Message,
+				Parameters:       pk.Parameters,
+				XUID:             pk.XUID,
+				PlatformChatID:   pk.PlatformChatID,
+			},
+		}
 	case *packet.AdventureSettings:
 	case *packet.TickSync:
 		return nil
@@ -424,10 +535,10 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 
 // ConvertFromLatest ...
 func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []packet.Packet {
-	fmt.Printf("1.19.8x -> 1.16.100: %T\n", pk)
+	// fmt.Printf("Latest -> 1.16.100: %T\n", pk)
 	switch pk := pk.(type) {
 	case *packet.ActorEvent:
-		if pk.EventType > packet.ActorEventFinishedChargingCrossbow {
+		if pk.EventType > packet.ActorEventFinishedChargingItem {
 			return nil
 		}
 	case *packet.AddActor:
@@ -508,7 +619,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 						Description:     c.Description,
 						Flags:           byte(c.Flags),
 						PermissionLevel: c.PermissionLevel,
-						Aliases:         c.Aliases,
+						//Aliases:         c.Aliases,
 						Overloads: lo.Map(c.Overloads, func(o protocol.CommandOverload, i int) legacyprotocol.CommandOverload {
 							return legacyprotocol.CommandOverload{Parameters: lo.Map(o.Parameters, func(p protocol.CommandParameter, _ int) legacyprotocol.CommandParameter {
 								return legacyprotocol.CommandParameter{
@@ -516,8 +627,8 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 									Type:                legacyprotocol.DowngradeParamType(p.Type),
 									Optional:            p.Optional,
 									CollapseEnumOptions: true,
-									Enum:                legacyprotocol.CommandEnum(p.Enum),
-									Suffix:              p.Suffix,
+									//Enum:                legacyprotocol.CommandEnum(p.Enum),
+									//Suffix:              p.Suffix,
 								}
 							})}
 						}),
@@ -549,6 +660,13 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				XOffset:        pk.XOffset,
 				YOffset:        pk.YOffset,
 				Pixels:         [][]color.RGBA{pk.Pixels},
+			},
+		}
+	case *packet.ContainerClose:
+		return []packet.Packet{
+			&legacypacket.ContainerClose{
+				WindowID:   pk.WindowID,
+				ServerSide: pk.ServerSide,
 			},
 		}
 	case *packet.CraftingData:
@@ -730,6 +848,13 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				}),
 			},
 		}
+	case *packet.Disconnect:
+		return []packet.Packet{
+			&legacypacket.Disconnect{
+				HideDisconnectionScreen: pk.HideDisconnectionScreen,
+				Message:                 pk.Message,
+			},
+		}
 	case *packet.EducationSettings:
 		return []packet.Packet{
 			&legacypacket.EducationSettings{
@@ -851,7 +976,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 						RequestID: response.RequestID,
 						ContainerInfo: lo.Map(response.ContainerInfo, func(info protocol.StackResponseContainerInfo, _ int) legacyprotocol.StackResponseContainerInfo {
 							return legacyprotocol.StackResponseContainerInfo{
-								ContainerID: legacyprotocol.DowngradeContainerID(info.ContainerID),
+								ContainerID: legacyprotocol.DowngradeContainerID(info.Container.ContainerID),
 								SlotInfo: lo.Map(info.SlotInfo, func(slot protocol.StackResponseSlotInfo, _ int) legacyprotocol.StackResponseSlotInfo {
 									return legacyprotocol.StackResponseSlotInfo{
 										Slot:           slot.Slot,
@@ -906,6 +1031,17 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				Chestplate:      downgradeItem(pk.Chestplate.Stack),
 				Leggings:        downgradeItem(pk.Leggings.Stack),
 				Boots:           downgradeItem(pk.Boots.Stack),
+			},
+		}
+	case *packet.MobEffect:
+		return []packet.Packet{
+			&legacypacket.MobEffect{
+				EntityRuntimeID: pk.EntityRuntimeID,
+				Operation:       pk.Operation,
+				EffectType:      pk.EffectType,
+				Amplifier:       pk.Amplifier,
+				Particles:       pk.Particles,
+				Duration:        pk.Duration,
 			},
 		}
 	case *packet.MobEquipment:
@@ -1005,12 +1141,36 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				}),
 			},
 		}
+	case *packet.ResourcePackStack:
+		return []packet.Packet{
+			&legacypacket.ResourcePackStack{
+				TexturePackRequired:             pk.TexturePackRequired,
+				BehaviourPacks:                  pk.BehaviourPacks,
+				TexturePacks:                    pk.TexturePacks,
+				BaseGameVersion:                 pk.BaseGameVersion,
+				Experiments:                     pk.Experiments,
+				PreviouslyHadExperimentsToggled: pk.ExperimentsPreviouslyToggled,
+			},
+		}
+	case *packet.RequestChunkRadius:
+		return []packet.Packet{
+			&legacypacket.RequestChunkRadius{
+				ChunkRadius: pk.ChunkRadius,
+			},
+		}
 	case *packet.SetActorData:
 		return []packet.Packet{
 			&legacypacket.SetActorData{
 				EntityRuntimeID: pk.EntityRuntimeID,
 				EntityMetadata:  legacyprotocol.DowngradeEntityMetadata(pk.EntityMetadata),
 				Tick:            pk.Tick,
+			},
+		}
+	case *packet.SetActorMotion:
+		return []packet.Packet{
+			&legacypacket.SetActorMotion{
+				EntityRuntimeID: pk.EntityRuntimeID,
+				Velocity:        pk.Velocity,
 			},
 		}
 	case *packet.SetTitle:
@@ -1100,6 +1260,18 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				Blocks:                          legacymappings.Blocks(),
 				Items:                           legacymappings.Items(),
 				ServerAuthoritativeInventory:    pk.ServerAuthoritativeInventory,
+			},
+		}
+	case *packet.Text:
+		return []packet.Packet{
+			&legacypacket.Text{
+				TextType:         pk.TextType,
+				NeedsTranslation: pk.NeedsTranslation,
+				SourceName:       pk.SourceName,
+				Message:          pk.Message,
+				Parameters:       pk.Parameters,
+				XUID:             pk.XUID,
+				PlatformChatID:   pk.PlatformChatID,
 			},
 		}
 	case *packet.UpdateAbilities:
@@ -1202,7 +1374,7 @@ func downgradeItem(input protocol.ItemStack) legacyprotocol.ItemStack {
 	}
 }
 
-// upgradeItem upgrades the input item stack to a v1.19.0 item stack. It returns a boolean indicating if the item was
+// upgradeItem upgrades the input item stack to the latest item stack. It returns a boolean indicating if the item was
 // upgraded successfully.
 func upgradeItem(input legacyprotocol.ItemStack) protocol.ItemStack {
 	if input.ItemType.NetworkID == 0 {
@@ -1222,7 +1394,7 @@ func upgradeItem(input legacyprotocol.ItemStack) protocol.ItemStack {
 	}
 }
 
-// downgradeBlockRuntimeID downgrades a v1.19.0 block runtime ID to a v1.16.100 block runtime ID.
+// downgradeBlockRuntimeID downgrades the latest block runtime ID to a v1.16.100 block runtime ID.
 func downgradeBlockRuntimeID(input uint32) uint32 {
 	name, properties, ok := latestmappings.RuntimeIDToState(input)
 	if !ok {
@@ -1231,7 +1403,7 @@ func downgradeBlockRuntimeID(input uint32) uint32 {
 	return legacymappings.StateToRuntimeID(name, properties)
 }
 
-// upgradeBlockRuntimeID upgrades a v1.16.100 block runtime ID to a v1.19.0 block runtime ID.
+// upgradeBlockRuntimeID upgrades a v1.16.100 block runtime ID to the latest block runtime ID.
 func upgradeBlockRuntimeID(input uint32) uint32 {
 	name, properties, ok := legacymappings.RuntimeIDToState(input)
 	if !ok {

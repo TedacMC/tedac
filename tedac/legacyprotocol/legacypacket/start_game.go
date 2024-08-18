@@ -102,8 +102,12 @@ type StartGame struct {
 	// GameRules defines game rules currently active with their respective values. The value of these game
 	// rules may be either 'bool', 'int32' or 'float32'. Some game rules are server side only, and don't
 	// necessarily need to be sent to the client.
-	GameRules                    map[string]interface{}
-	Experiments                  []protocol.ExperimentData
+	GameRules map[string]interface{}
+	// Experiments holds a list of experiments that are either enabled or disabled in the world that the
+	// player spawns in.
+	Experiments []protocol.ExperimentData
+	// ExperimentsPreviouslyToggled specifies if any experiments were previously toggled in this world. It is
+	// probably used for some kind of metrics.
 	ExperimentsPreviouslyToggled bool
 	// BonusChestEnabled specifies if the world had the bonus map setting enabled when generating it. It does
 	// not have any effect client-side.
@@ -177,7 +181,7 @@ type StartGame struct {
 	// table. Note that the exact correct random implementation must be used to produce the correct results
 	// both client- and server-side.
 	EnchantmentSeed int32
-	// Blocks is a list of all blocks registered on the server.
+	// Blocks is a list of all custom blocks registered on the server.
 	Blocks []protocol.BlockEntry
 	// Items is a list of all items with their legacy IDs which are available in the game. Failing to send any
 	// of the items that are in the game will crash mobile clients.
@@ -197,76 +201,89 @@ func (*StartGame) ID() uint32 {
 }
 
 // Marshal ...
-func (pk *StartGame) Marshal(w protocol.IO) {
-	w.Varint64(&pk.EntityUniqueID)
-	w.Varuint64(&pk.EntityRuntimeID)
-	w.Varint32(&pk.PlayerGameMode)
-	w.Vec3(&pk.PlayerPosition)
-	w.Float32(&pk.Pitch)
-	w.Float32(&pk.Yaw)
-	w.Varint32(&pk.WorldSeed)
-	w.Int16(&pk.SpawnBiomeType)
-	w.String(&pk.UserDefinedBiomeName)
-	w.Varint32(&pk.Dimension)
-	w.Varint32(&pk.Generator)
-	w.Varint32(&pk.WorldGameMode)
-	w.Varint32(&pk.Difficulty)
-	w.UBlockPos(&pk.WorldSpawn)
-	w.Bool(&pk.AchievementsDisabled)
-	w.Varint32(&pk.DayCycleLockTime)
-	w.Varint32(&pk.EducationEditionOffer)
-	w.Bool(&pk.EducationFeaturesEnabled)
-	w.String(&pk.EducationProductID)
-	w.Float32(&pk.RainLevel)
-	w.Float32(&pk.LightningLevel)
-	w.Bool(&pk.ConfirmedPlatformLockedContent)
-	w.Bool(&pk.MultiPlayerGame)
-	w.Bool(&pk.LANBroadcastEnabled)
-	w.Varint32(&pk.XBLBroadcastMode)
-	w.Varint32(&pk.PlatformBroadcastMode)
-	w.Bool(&pk.CommandsEnabled)
-	w.Bool(&pk.TexturePackRequired)
-	legacyprotocol.WriteGameRules(w, &pk.GameRules)
-	protocol.SliceUint32Length(w, &pk.Experiments)
-	w.Bool(&pk.ExperimentsPreviouslyToggled)
-	w.Bool(&pk.BonusChestEnabled)
-	w.Bool(&pk.StartWithMapEnabled)
-	w.Varint32(&pk.PlayerPermissions)
-	w.Int32(&pk.ServerChunkTickRadius)
-	w.Bool(&pk.HasLockedBehaviourPack)
-	w.Bool(&pk.HasLockedTexturePack)
-	w.Bool(&pk.FromLockedWorldTemplate)
-	w.Bool(&pk.MSAGamerTagsOnly)
-	w.Bool(&pk.FromWorldTemplate)
-	w.Bool(&pk.WorldTemplateSettingsLocked)
-	w.Bool(&pk.OnlySpawnV1Villagers)
-	w.String(&pk.BaseGameVersion)
-	w.Int32(&pk.LimitedWorldWidth)
-	w.Int32(&pk.LimitedWorldDepth)
-	w.Bool(&pk.NewNether)
-	opt := protocol.Option(pk.ForceExperimentalGameplay)
-	protocol.OptionalFunc(w, &opt, w.Bool)
-	w.String(&pk.LevelID)
-	w.String(&pk.WorldName)
-	w.String(&pk.TemplateContentIdentity)
-	w.Bool(&pk.Trial)
-	w.Varuint32(&pk.ServerAuthoritativeMovementMode)
-	w.Int64(&pk.Time)
-	w.Varint32(&pk.EnchantmentSeed)
-	l := uint32(len(pk.Blocks))
-	w.Varuint32(&l)
+func (pk *StartGame) Marshal(io protocol.IO) {
+	io.Varint64(&pk.EntityUniqueID)
+	io.Varuint64(&pk.EntityRuntimeID)
+	io.Varint32(&pk.PlayerGameMode)
+	io.Vec3(&pk.PlayerPosition)
+	io.Float32(&pk.Pitch)
+	io.Float32(&pk.Yaw)
+	io.Varint32(&pk.WorldSeed)
+	io.Int16(&pk.SpawnBiomeType)
+	io.String(&pk.UserDefinedBiomeName)
+	io.Varint32(&pk.Dimension)
+	io.Varint32(&pk.Generator)
+	io.Varint32(&pk.WorldGameMode)
+	io.Varint32(&pk.Difficulty)
+	io.UBlockPos(&pk.WorldSpawn)
+	io.Bool(&pk.AchievementsDisabled)
+	io.Varint32(&pk.DayCycleLockTime)
+	io.Varint32(&pk.EducationEditionOffer)
+	io.Bool(&pk.EducationFeaturesEnabled)
+	io.String(&pk.EducationProductID)
+	io.Float32(&pk.RainLevel)
+	io.Float32(&pk.LightningLevel)
+	io.Bool(&pk.ConfirmedPlatformLockedContent)
+	io.Bool(&pk.MultiPlayerGame)
+	io.Bool(&pk.LANBroadcastEnabled)
+	io.Varint32(&pk.XBLBroadcastMode)
+	io.Varint32(&pk.PlatformBroadcastMode)
+	io.Bool(&pk.CommandsEnabled)
+	io.Bool(&pk.TexturePackRequired)
+
+	legacyprotocol.WriteGameRules(io, &pk.GameRules)
+	l := uint32(len(pk.Experiments))
+	io.Uint32(&l)
+	for _, x := range pk.Experiments {
+		io.String(&x.Name)
+		io.Bool(&x.Enabled)
+	}
+
+	io.Bool(&pk.ExperimentsPreviouslyToggled)
+	io.Bool(&pk.BonusChestEnabled)
+	io.Bool(&pk.StartWithMapEnabled)
+	io.Varint32(&pk.PlayerPermissions)
+	io.Int32(&pk.ServerChunkTickRadius)
+	io.Bool(&pk.HasLockedBehaviourPack)
+	io.Bool(&pk.HasLockedTexturePack)
+	io.Bool(&pk.FromLockedWorldTemplate)
+	io.Bool(&pk.MSAGamerTagsOnly)
+	io.Bool(&pk.FromWorldTemplate)
+	io.Bool(&pk.WorldTemplateSettingsLocked)
+	io.Bool(&pk.OnlySpawnV1Villagers)
+	io.String(&pk.BaseGameVersion)
+	io.Int32(&pk.LimitedWorldWidth)
+	io.Int32(&pk.LimitedWorldDepth)
+	io.Bool(&pk.NewNether)
+	io.Bool(&pk.ForceExperimentalGameplay)
+	if pk.ForceExperimentalGameplay {
+		// This might look wrong, but is in fact correct: Mojang is writing this bool if the same bool above
+		// is set to true.
+		io.Bool(&pk.ForceExperimentalGameplay)
+	}
+	io.String(&pk.LevelID)
+	io.String(&pk.WorldName)
+	io.String(&pk.TemplateContentIdentity)
+	io.Bool(&pk.Trial)
+	io.Varuint32(&pk.ServerAuthoritativeMovementMode)
+	io.Int64(&pk.Time)
+	io.Varint32(&pk.EnchantmentSeed)
+
+	l = uint32(len(pk.Blocks))
+	io.Varuint32(&l)
 	for i := range pk.Blocks {
-		w.String(&pk.Blocks[i].Name)
-		w.NBT(&pk.Blocks[i].Properties, nbt.NetworkLittleEndian)
+		io.String(&pk.Blocks[i].Name)
+		io.NBT(&pk.Blocks[i].Properties, nbt.NetworkLittleEndian)
 	}
 
 	l = uint32(len(pk.Items))
-	w.Varuint32(&l)
+	io.Varuint32(&l)
 	for i := range pk.Items {
-		w.String(&pk.Items[i].Name)
-		w.Int16(&pk.Items[i].RuntimeID)
-		w.Bool(&pk.Items[i].ComponentBased)
+		io.String(&pk.Items[i].Name)
+		io.Int16(&pk.Items[i].RuntimeID)
+		io.Bool(&pk.Items[i].ComponentBased)
 	}
-	w.String(&pk.MultiPlayerCorrelationID)
-	w.Bool(&pk.ServerAuthoritativeInventory)
+
+	io.String(&pk.MultiPlayerCorrelationID)
+	io.Bool(&pk.ServerAuthoritativeInventory)
 }

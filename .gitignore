@@ -1,5 +1,7 @@
+.idea/
 /token.tok
 build/bin
 node_modules
 frontend/dist
 packcache
+tedac.exe

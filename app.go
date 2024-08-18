@@ -118,7 +118,7 @@ func (a *App) Connect(address string) error {
 	var cachedPacks []*resource.Pack
 	if useCache {
 		for _, name := range cachedPackNames {
-			pack, err := resource.Compile(fmt.Sprintf("packcache/%s.mcpack", name))
+			pack, err := resource.ReadPath(fmt.Sprintf("packcache/%s.mcpack", name))
 			if err != nil {
 				continue
 			}
@@ -141,6 +141,9 @@ func (a *App) Connect(address string) error {
 	go a.startRPC()
 
 	a.listener, err = minecraft.ListenConfig{
+		AllowInvalidPackets: true,
+		AllowUnknownPackets: true,
+
 		StatusProvider:    p,
 		ResourcePacks:     append(packs, cachedPacks...),
 		AcceptedProtocols: []minecraft.Protocol{tedac.Protocol{}},

@@ -28,7 +28,7 @@ type CraftingEvent struct {
 
 // ID ...
 func (*CraftingEvent) ID() uint32 {
-	return packet.IDCraftingEvent
+	return packet.IDCraftingData // ignore
 }
 
 // Marshal ...

@@ -8,7 +8,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// MultiRakNet is an implementation of a RakNet v9/10 Network.
+// MultiRakNet is an implementation of a RakNet v9 Network.
 type MultiRakNet struct {
 	minecraft.RakNet
 }
@@ -19,7 +19,7 @@ const legacyRakNet = 10
 // Listen ...
 func (MultiRakNet) Listen(address string) (minecraft.NetworkListener, error) {
 	return raknet.ListenConfig{
-		ProtocolVersions: []byte{10}, // Version 9 is required for v1.16.100 MV.
+		ProtocolVersions: []byte{legacyRakNet}, // Version 10 is required for v1.16.100 MV.
 	}.Listen(address)
 }
 

@@ -225,3 +225,25 @@ export function Hide(): void;
 // [Show](https://wails.io/docs/reference/runtime/intro#show)
 // Shows the application.
 export function Show(): void;
+
+// [ClipboardGetText](https://wails.io/docs/reference/runtime/clipboard#clipboardgettext)
+// Returns the current text stored on clipboard
+export function ClipboardGetText(): Promise<string>;
+
+// [ClipboardSetText](https://wails.io/docs/reference/runtime/clipboard#clipboardsettext)
+// Sets a text on the clipboard
+export function ClipboardSetText(text: string): Promise<boolean>;
+
+// [OnFileDrop](https://wails.io/docs/reference/runtime/draganddrop#onfiledrop)
+// OnFileDrop listens to drag and drop events and calls the callback with the coordinates of the drop and an array of path strings.
+export function OnFileDrop(callback: (x: number, y: number ,paths: string[]) => void, useDropTarget: boolean) :void
+
+// [OnFileDropOff](https://wails.io/docs/reference/runtime/draganddrop#dragandddropoff)
+// OnFileDropOff removes the drag and drop listeners and handlers.
+export function OnFileDropOff() :void
+
+// Check if the file path resolver is available
+export function CanResolveFilePaths(): boolean;
+
+// Resolves file paths for an array of files
+export function ResolveFilePaths(files: File[]): void
