@@ -254,6 +254,13 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 		return []packet.Packet{
 			&packet.RequestNetworkSettings{ClientProtocol: protocol.CurrentProtocol},
 		}
+	case *packet.Transfer:
+		return []packet.Packet{
+			&legacypacket.Transfer{
+				Address: pk.Address,
+				Port:    pk.Port,
+			},
+		}
 	case *packet.SetTitle:
 		return []packet.Packet{
 			&legacypacket.SetTitle{
@@ -630,17 +637,6 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			&legacypacket.ResourcePacksInfo{
 				TexturePackRequired: pk.TexturePackRequired,
 				HasScripts:          pk.HasScripts,
-				BehaviourPacks: lo.Map(pk.BehaviourPacks, func(pack protocol.BehaviourPackInfo, _ int) legacyprotocol.ResourcePackInfo {
-					return legacyprotocol.ResourcePackInfo{
-						UUID:            pack.UUID,
-						Version:         pack.Version,
-						Size:            pack.Size,
-						ContentKey:      pack.ContentKey,
-						SubPackName:     pack.SubPackName,
-						ContentIdentity: pack.ContentIdentity,
-						HasScripts:      pack.HasScripts,
-					}
-				}),
 				TexturePacks: lo.Map(pk.TexturePacks, func(pack protocol.TexturePackInfo, _ int) legacyprotocol.ResourcePackInfo {
 					return legacyprotocol.ResourcePackInfo{
 						UUID:            pack.UUID,

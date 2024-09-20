@@ -10,12 +10,12 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/df-mc/atomic v1.10.0 h1:0ZuxBKwR/hxcFGorKiHIp+hY7hgY+XBTzhCYD2NqSEg=
 github.com/df-mc/atomic v1.10.0/go.mod h1:Gw9rf+rPIbydMjA329Jn4yjd/O2c/qusw3iNp4tFGSc=
-github.com/df-mc/dragonfly v0.9.18-0.20240815142955-a792bfd97d5c h1:dQz6G59Bhr7D6NJXENOMSehd5tB7axNkDRDrhxg2oRE=
-github.com/df-mc/dragonfly v0.9.18-0.20240815142955-a792bfd97d5c/go.mod h1:nDs4PgdB+mXFLKKNBvCSxATrS4GBEIuV7vsaXUMAvgw=
+github.com/df-mc/dragonfly v0.9.18 h1:Ul+BuMn4rzjNj5C2dxlhM/DqR1/MazSmoS93c6bfMHE=
+github.com/df-mc/dragonfly v0.9.18/go.mod h1:1G+G/KKvsDLWRfLy26ALUH83uq4Focb4O5xhmmKKfDE=
 github.com/df-mc/goleveldb v1.1.9 h1:ihdosZyy5jkQKrxucTQmN90jq/2lUwQnJZjIYIC/9YU=
 github.com/df-mc/goleveldb v1.1.9/go.mod h1:+NHCup03Sci5q84APIA21z3iPZCuk6m6ABtg4nANCSk=
-github.com/df-mc/worldupgrader v1.0.16 h1:3n9yvLFNCe8IDJnUEliTGbhDvV1frjtPX/y5zl3Q5EE=
-github.com/df-mc/worldupgrader v1.0.16/go.mod h1:tsSOLTRm9mpG7VHvYpAjjZrkRHWmSbKZAm9bOLNnlDk=
+github.com/df-mc/worldupgrader v1.0.17 h1:9NRTihn8/KFL+ajUHDc+KikZcsrhoxR/Tq2ekA5ZR7k=
+github.com/df-mc/worldupgrader v1.0.17/go.mod h1:tsSOLTRm9mpG7VHvYpAjjZrkRHWmSbKZAm9bOLNnlDk=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/go-gl/mathgl v1.1.0 h1:0lzZ+rntPX3/oGrDzYGdowSLC2ky8Osirvf5uAwfIEA=
@@ -120,8 +120,8 @@ github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/syossan27/tebata v0.0.0-20180602121909-b283fe4bc5ba/go.mod h1:iLnlXG2Pakcii2CU0cbY07DRCSvpWNa7nFxtevhOChk=
-github.com/tedacmc/tedac-gophertunnel v0.0.25 h1:mH4vvCPS+uTSIQcILOyzBksDjbWP9WjK7qGGWQwrOfk=
-github.com/tedacmc/tedac-gophertunnel v0.0.25/go.mod h1:k2HhHZn9Qh61oIbosHJiYu1xqxXE8W4902HdU3C3PBE=
+github.com/tedacmc/tedac-gophertunnel v0.0.28 h1:Pigq/7AKIY87lsbdJI4fEGgIMBu4k3U0ULkns8amYPM=
+github.com/tedacmc/tedac-gophertunnel v0.0.28/go.mod h1:k2HhHZn9Qh61oIbosHJiYu1xqxXE8W4902HdU3C3PBE=
 github.com/tedacmc/tedac-raknet v0.0.4 h1:GcRfp38iXARo/Wb+nfrCPHrYpqgAGi7XzapwunIA/LQ=
 github.com/tedacmc/tedac-raknet v0.0.4/go.mod h1:vT0+qrD5NHYW9OElUncfIRT0brTgJhxyaozMZyjL2Zc=
 github.com/tkrajina/go-reflector v0.5.6 h1:hKQ0gyocG7vgMD2M3dRlYN6WBBOmdoOzJ6njQSepKdE=

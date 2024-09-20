@@ -6,14 +6,14 @@ toolchain go1.22.5
 
 require (
 	github.com/df-mc/atomic v1.10.0
-	github.com/df-mc/dragonfly v0.9.18-0.20240815142955-a792bfd97d5c
-	github.com/df-mc/worldupgrader v1.0.16
+	github.com/df-mc/dragonfly v0.9.18
+	github.com/df-mc/worldupgrader v1.0.17
 	github.com/go-gl/mathgl v1.1.0
 	github.com/google/uuid v1.6.0
 	github.com/hugolgst/rich-go v0.0.0-20210925091458-d59fb695d9c0
 	github.com/samber/lo v1.38.1
 	github.com/sandertv/go-raknet v1.14.1
-	github.com/sandertv/gophertunnel v1.40.2-0.20240815223241-7e1534ac8080
+	github.com/sandertv/gophertunnel v1.41.0
 	github.com/segmentio/fasthash v1.0.3
 	github.com/wailsapp/wails v1.16.9
 	github.com/wailsapp/wails/v2 v2.9.1
@@ -60,4 +60,4 @@ require (
 
 replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.4
 
-replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v0.0.25
+replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v0.0.28
