@@ -376,7 +376,8 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 				}
 			}
 			if err := serverConn.WritePacket(pk); err != nil {
-				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+				var disconnect minecraft.DisconnectError
+				if errors.As(errors.Unwrap(err), &disconnect) {
 					_ = a.listener.Disconnect(conn, disconnect.Error())
 				}
 				return
@@ -390,7 +391,8 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 		for {
 			pk, err := serverConn.ReadPacket()
 			if err != nil {
-				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+				var disconnect minecraft.DisconnectError
+				if errors.As(errors.Unwrap(err), &disconnect) {
 					_ = a.listener.Disconnect(conn, disconnect.Error())
 				}
 				return
