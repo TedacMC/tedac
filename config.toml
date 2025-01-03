@@ -1,4 +1,3 @@
-
 [Connection]
-  LocalAddress = "0.0.0.0:19132"
-  RemoteAddress = "zeqa.net:19132"
+LocalAddress = "0.0.0.0:19132"
+RemoteAddress = "zeqa.net:19132"

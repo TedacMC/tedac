@@ -1,11 +1,12 @@
 package raknet
 
 import (
+	"log/slog"
+	"net"
+
 	"github.com/sandertv/go-raknet"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"log/slog"
-	"net"
 )
 
 // MultiRakNet is an implementation of a RakNet v9/10 Network.

@@ -7,6 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"os"
+	"os/exec"
+	"runtime"
+	"sync"
+	"time"
+
 	"github.com/df-mc/atomic"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/google/uuid"
@@ -22,12 +29,6 @@ import (
 	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
 	"github.com/wailsapp/wails/lib/renderer/webview"
 	"golang.org/x/oauth2"
-	"net"
-	"os"
-	"os/exec"
-	"runtime"
-	"sync"
-	"time"
 )
 
 // App ...
@@ -275,33 +276,33 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 
 				currentYaw, currentPitch := yaw.Load(), pitch.Load()
 
-				inputs := uint64(0)
+				inputs := protocol.NewBitset(packet.PlayerAuthInputBitsetSize)
 				if startedSneaking.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStartSneaking
+					inputs.Set(packet.InputFlagStartSneaking)
 				}
 				if stoppedSneaking.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStopSneaking
+					inputs.Set(packet.InputFlagStopSneaking)
 				}
 				if startedSprinting.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStartSprinting
+					inputs.Set(packet.InputFlagStartSprinting)
 				}
 				if stoppedSprinting.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStopSprinting
+					inputs.Set(packet.InputFlagStopSprinting)
 				}
 				if startedGliding.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStartGliding
+					inputs.Set(packet.InputFlagStartGliding)
 				}
 				if stoppedGliding.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStopGliding
+					inputs.Set(packet.InputFlagStopGliding)
 				}
 				if startedSwimming.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStartSwimming
+					inputs.Set(packet.InputFlagStartSwimming)
 				}
 				if stoppedSwimming.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStopSwimming
+					inputs.Set(packet.InputFlagStopSwimming)
 				}
 				if startedJumping.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagJumping
+					inputs.Set(packet.InputFlagJumping)
 				}
 
 				err := serverConn.WritePacket(&packet.PlayerAuthInput{

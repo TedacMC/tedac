@@ -2,8 +2,9 @@ package chunk
 
 import (
 	"bytes"
-	"github.com/df-mc/dragonfly/server/block/cube"
 	"sync"
+
+	"github.com/df-mc/dragonfly/server/block/cube"
 )
 
 // pool is used to pool byte buffers used for encoding chunks.

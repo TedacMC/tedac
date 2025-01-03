@@ -4,13 +4,14 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"sort"
+	"strings"
+	"unsafe"
+
 	"github.com/df-mc/worldupgrader/blockupgrader"
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
 	"github.com/segmentio/fasthash/fnv1"
 	"github.com/tedacmc/tedac/tedac/legacychunk"
-	"sort"
-	"strings"
-	"unsafe"
 )
 
 var (

@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"compress/zlib"
 	"fmt"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"io"
 	"math"
+
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
 // ZLibCompression is an implementation of the zLib compression algorithm.

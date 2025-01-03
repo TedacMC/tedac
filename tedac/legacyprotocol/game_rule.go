@@ -2,6 +2,7 @@ package legacyprotocol
 
 import (
 	"fmt"
+
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
