@@ -129,7 +129,7 @@ func (pk *AvailableCommands) unmarshal(r *protocol.Reader) {
 			for k, param := range overload.Parameters {
 				if param.Type&protocol.CommandArgSoftEnum != 0 {
 					offset := param.Type & 0xffff
-					r.LimitUint32(offset, uint32(len(softEnums))-1)
+					legacyprotocol.LimitUint32(offset, uint32(len(softEnums))-1)
 					pk.Commands[i].Overloads[j].Parameters[k].Enum = softEnums[offset]
 				}
 			}
@@ -177,7 +177,7 @@ func enumOption(r *protocol.Reader, option *string, enumValues []string) {
 	default:
 		r.Uint32(&index)
 	}
-	r.LimitUint32(index, uint32(len(enumValues))-1)
+	legacyprotocol.LimitUint32(index, uint32(len(enumValues))-1)
 	*option = enumValues[index]
 }
 
