@@ -2,6 +2,7 @@ package latestmappings
 
 import (
 	_ "embed"
+
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
 )
 

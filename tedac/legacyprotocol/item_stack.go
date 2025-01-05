@@ -67,7 +67,7 @@ func StackRequest(r *protocol.Reader, x *ItemStackRequest) {
 	var count uint32
 	r.Varint32(&x.RequestID)
 	r.Varuint32(&count)
-	r.LimitUint32(count, mediumLimit)
+	LimitUint32(count, mediumLimit)
 
 	x.Actions = make([]StackRequestAction, count)
 	for i := uint32(0); i < count; i++ {
@@ -488,7 +488,7 @@ func (a *CraftResultsDeprecatedStackRequestAction) Marshal(w protocol.IO) {
 func (a *CraftResultsDeprecatedStackRequestAction) Unmarshal(r *protocol.Reader) {
 	var l uint32
 	r.Varuint32(&l)
-	r.LimitUint32(l, mediumLimit*2)
+	LimitUint32(l, mediumLimit*2)
 
 	a.ResultItems = make([]ItemStack, l)
 	for i := uint32(0); i < l; i++ {

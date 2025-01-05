@@ -316,8 +316,8 @@ func unmarshalShaped(r *protocol.Reader, recipe *ShapedRecipe) {
 	r.String(&recipe.RecipeID)
 	r.Varint32(&recipe.Width)
 	r.Varint32(&recipe.Height)
-	r.LimitInt32(recipe.Width, 0, lowerLimit)
-	r.LimitInt32(recipe.Height, 0, lowerLimit)
+	LimitInt32(recipe.Width, 0, lowerLimit)
+	LimitInt32(recipe.Height, 0, lowerLimit)
 
 	itemCount := int(recipe.Width * recipe.Height)
 	recipe.Input = make([]RecipeIngredientItem, itemCount)
@@ -326,7 +326,7 @@ func unmarshalShaped(r *protocol.Reader, recipe *ShapedRecipe) {
 	}
 	var outputCount uint32
 	r.Varuint32(&outputCount)
-	r.LimitUint32(outputCount, lowerLimit)
+	LimitUint32(outputCount, lowerLimit)
 
 	recipe.Output = make([]ItemStack, outputCount)
 	for i := uint32(0); i < outputCount; i++ {
@@ -361,13 +361,13 @@ func unmarshalShapeless(r *protocol.Reader, recipe *ShapelessRecipe) {
 	var count uint32
 	r.String(&recipe.RecipeID)
 	r.Varuint32(&count)
-	r.LimitUint32(count, lowerLimit)
+	LimitUint32(count, lowerLimit)
 	recipe.Input = make([]RecipeIngredientItem, count)
 	for i := uint32(0); i < count; i++ {
 		RecipeIngredient(r, &recipe.Input[i])
 	}
 	r.Varuint32(&count)
-	r.LimitUint32(count, lowerLimit)
+	LimitUint32(count, lowerLimit)
 	recipe.Output = make([]ItemStack, count)
 	for i := uint32(0); i < count; i++ {
 		Item(r, &recipe.Output[i])

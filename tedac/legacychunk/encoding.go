@@ -3,6 +3,7 @@ package legacychunk
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )

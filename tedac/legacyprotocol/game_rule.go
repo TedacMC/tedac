@@ -11,7 +11,7 @@ import (
 func GameRules(r *protocol.Reader, x *map[string]any) {
 	var count uint32
 	r.Varuint32(&count)
-	r.LimitUint32(count, mediumLimit)
+	LimitUint32(count, mediumLimit)
 
 	for i := uint32(0); i < count; i++ {
 		// Each of the game rules holds a name and a value type, with the actual value depending on the type

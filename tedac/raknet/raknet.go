@@ -1,6 +1,7 @@
 package raknet
 
 import (
+	"log/slog"
 	"net"
 
 	"github.com/sandertv/go-raknet"
@@ -33,5 +34,5 @@ func (MultiRakNet) Compression(conn net.Conn) packet.Compression {
 
 // init registers the MultiRakNet network. It overrides the existing minecraft.RakNet network.
 func init() {
-	minecraft.RegisterNetwork("raknet", MultiRakNet{})
+	minecraft.RegisterNetwork("raknet", func(l *slog.Logger) minecraft.Network { return MultiRakNet{} })
 }

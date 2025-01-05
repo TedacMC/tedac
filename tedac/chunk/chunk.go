@@ -1,8 +1,9 @@
 package chunk
 
 import (
-	"github.com/df-mc/dragonfly/server/block/cube"
 	"sync"
+
+	"github.com/df-mc/dragonfly/server/block/cube"
 )
 
 // Chunk is a segment in the world with a size of 16x16x256 blocks. A chunk contains multiple sub chunks

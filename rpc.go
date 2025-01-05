@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/hugolgst/rich-go/client"
 	"time"
+
+	"github.com/hugolgst/rich-go/client"
 )
 
 // discordID represents the Discord application ID of Tedac.

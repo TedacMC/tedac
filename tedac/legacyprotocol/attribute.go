@@ -24,7 +24,7 @@ type Attribute struct {
 func Attributes(r *protocol.Reader, x *[]Attribute) {
 	var count uint32
 	r.Varuint32(&count)
-	r.LimitUint32(count, mediumLimit)
+	LimitUint32(count, mediumLimit)
 
 	*x = make([]Attribute, count)
 	for i := uint32(0); i < count; i++ {
@@ -54,7 +54,7 @@ func WriteAttributes(w protocol.IO, x *[]Attribute) {
 func InitialAttributes(r *protocol.Reader, x *[]Attribute) {
 	var count uint32
 	r.Varuint32(&count)
-	r.LimitUint32(count, mediumLimit)
+	LimitUint32(count, mediumLimit)
 	*x = make([]Attribute, count)
 	for i := uint32(0); i < count; i++ {
 		r.String(&(*x)[i].Name)

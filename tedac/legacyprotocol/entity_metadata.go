@@ -1,8 +1,9 @@
 package legacyprotocol
 
 import (
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"math"
+
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
 // DowngradeEntityMetadata downgrades entity metadata from latest version to legacy version.

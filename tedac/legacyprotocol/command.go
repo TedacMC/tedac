@@ -188,7 +188,7 @@ func CommandData(r *protocol.Reader, x *Command, enums []CommandEnum, suffixes [
 	r.Uint8(&x.PermissionLevel)
 	r.Int32(&aliasOffset)
 	if aliasOffset >= 0 {
-		r.LimitInt32(aliasOffset, 0, int32(len(enums)-1))
+		LimitInt32(aliasOffset, 0, int32(len(enums)-1))
 		x.Aliases = enums[aliasOffset].Options
 	}
 	r.Varuint32(&overloadCount)
@@ -255,11 +255,11 @@ func CommandParam(r *protocol.Reader, x *CommandParameter, enums []CommandEnum, 
 	// read method will have to do this itself.
 	if x.Type&CommandArgEnum != 0 {
 		offset := x.Type & 0xffff
-		r.LimitUint32(offset, uint32(len(enums))-1)
+		LimitUint32(offset, uint32(len(enums))-1)
 		x.Enum = enums[offset]
 	} else if x.Type&CommandArgSuffixed != 0 {
 		offset := x.Type & 0xffff
-		r.LimitUint32(offset, uint32(len(suffixes))-1)
+		LimitUint32(offset, uint32(len(suffixes))-1)
 		x.Suffix = suffixes[offset]
 	}
 }
@@ -290,8 +290,8 @@ func EnumConstraint(r *protocol.Reader, x *CommandEnumConstraint, enums []Comman
 	r.Uint32(&enumValueIndex)
 	r.Uint32(&enumIndex)
 
-	r.LimitUint32(enumValueIndex, uint32(len(enumValues))-1)
-	r.LimitUint32(enumIndex, uint32(len(enums))-1)
+	LimitUint32(enumValueIndex, uint32(len(enumValues))-1)
+	LimitUint32(enumIndex, uint32(len(enums))-1)
 
 	x.EnumOption = enumValues[enumValueIndex]
 	x.EnumName = enums[enumIndex].Type

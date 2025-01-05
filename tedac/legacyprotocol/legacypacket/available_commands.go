@@ -110,7 +110,7 @@ func enumOption(r *protocol.Reader, option *string, enumValues []string) {
 	default:
 		r.Uint32(&index)
 	}
-	r.LimitUint32(index, uint32(len(enumValues))-1)
+	legacyprotocol.LimitUint32(index, uint32(len(enumValues))-1)
 	*option = enumValues[index]
 }
 

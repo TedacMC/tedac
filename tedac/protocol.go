@@ -63,6 +63,8 @@ func (Protocol) Packets(bool) packet.Pool {
 	pool[packet.IDStructureBlockUpdate] = func() packet.Packet { return &legacypacket.StructureBlockUpdate{} }
 	pool[packet.IDStructureTemplateDataRequest] = func() packet.Packet { return &legacypacket.StructureTemplateDataRequest{} }
 	pool[packet.IDText] = func() packet.Packet { return &legacypacket.Text{} }
+	pool[packet.IDEmote] = func() packet.Packet { return &legacypacket.Emote{} }
+	pool[packet.IDTransfer] = func() packet.Packet { return &legacypacket.Transfer{} }
 	return pool
 }
 
@@ -129,6 +131,16 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 			&packet.Disconnect{
 				HideDisconnectionScreen: pk.HideDisconnectionScreen,
 				Message:                 pk.Message,
+			},
+		}
+	case *legacypacket.Emote:
+		return []packet.Packet{
+			&packet.Emote{
+				EntityRuntimeID: pk.EntityRuntimeID,
+				EmoteID:         pk.EmoteID,
+				XUID:            pk.XUID,
+				PlatformID:      pk.PlatformID,
+				Flags:           pk.Flags,
 			},
 		}
 	case *legacypacket.InventoryTransaction:
@@ -383,11 +395,10 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				Position:         pk.Position,
 				MoveVector:       pk.MoveVector,
 				HeadYaw:          pk.HeadYaw,
-				InputData:        pk.InputData,
+				InputData:        legacyprotocol.BitSet(pk.InputData, packet.PlayerAuthInputBitsetSize),
 				InputMode:        pk.InputMode,
 				PlayMode:         pk.PlayMode,
 				InteractionModel: packet.InteractionModelCrosshair,
-				GazeDirection:    pk.GazeDirection,
 				Tick:             pk.Tick,
 				Delta:            pk.Delta,
 			},
@@ -399,35 +410,6 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				Skin:        legacyprotocol.LatestSkin(pk.Skin),
 				NewSkinName: pk.NewSkinName,
 				OldSkinName: pk.OldSkinName,
-			},
-		}
-	case *legacypacket.ResourcePacksInfo:
-		return []packet.Packet{
-			&packet.ResourcePacksInfo{
-				TexturePackRequired: pk.TexturePackRequired,
-				HasScripts:          pk.HasScripts,
-				BehaviourPacks: lo.Map(pk.BehaviourPacks, func(pack legacyprotocol.ResourcePackInfo, _ int) protocol.BehaviourPackInfo {
-					return protocol.BehaviourPackInfo{
-						UUID:            pack.UUID,
-						Version:         pack.Version,
-						Size:            pack.Size,
-						ContentKey:      pack.ContentKey,
-						SubPackName:     pack.SubPackName,
-						ContentIdentity: pack.ContentIdentity,
-						HasScripts:      pack.HasScripts,
-					}
-				}),
-				TexturePacks: lo.Map(pk.TexturePacks, func(pack legacyprotocol.ResourcePackInfo, _ int) protocol.TexturePackInfo {
-					return protocol.TexturePackInfo{
-						UUID:            pack.UUID,
-						Version:         pack.Version,
-						Size:            pack.Size,
-						ContentKey:      pack.ContentKey,
-						SubPackName:     pack.SubPackName,
-						ContentIdentity: pack.ContentIdentity,
-						HasScripts:      pack.HasScripts,
-					}
-				}),
 			},
 		}
 	case *legacypacket.ResourcePackStack:
@@ -519,6 +501,13 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 				Parameters:       pk.Parameters,
 				XUID:             pk.XUID,
 				PlatformChatID:   pk.PlatformChatID,
+			},
+		}
+	case *legacypacket.Transfer:
+		return []packet.Packet{
+			&packet.Transfer{
+				Address: pk.Address,
+				Port:    pk.Port,
 			},
 		}
 	case *packet.AdventureSettings:
@@ -865,11 +854,21 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				HasQuiz:               pk.HasQuiz,
 			},
 		}
+	case *packet.Emote:
+		return []packet.Packet{
+			&legacypacket.Emote{
+				EntityRuntimeID: pk.EntityRuntimeID,
+				EmoteID:         pk.EmoteID,
+				XUID:            pk.XUID,
+				PlatformID:      pk.PlatformID,
+				Flags:           pk.Flags,
+			},
+		}
 	case *packet.Event:
 		// TODO: support
 		return []packet.Packet{
 			&legacypacket.Event{
-				EntityRuntimeID: pk.EntityRuntimeID,
+				EntityRuntimeID: uint64(pk.EntityRuntimeID),
 				EventType:       0,
 				UsePlayerID:     pk.UsePlayerID,
 			},
@@ -1117,20 +1116,9 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			&legacypacket.ResourcePacksInfo{
 				TexturePackRequired: pk.TexturePackRequired,
 				HasScripts:          pk.HasScripts,
-				BehaviourPacks: lo.Map(pk.BehaviourPacks, func(pack protocol.BehaviourPackInfo, _ int) legacyprotocol.ResourcePackInfo {
-					return legacyprotocol.ResourcePackInfo{
-						UUID:            pack.UUID,
-						Version:         pack.Version,
-						Size:            pack.Size,
-						ContentKey:      pack.ContentKey,
-						SubPackName:     pack.SubPackName,
-						ContentIdentity: pack.ContentIdentity,
-						HasScripts:      pack.HasScripts,
-					}
-				}),
 				TexturePacks: lo.Map(pk.TexturePacks, func(pack protocol.TexturePackInfo, _ int) legacyprotocol.ResourcePackInfo {
 					return legacyprotocol.ResourcePackInfo{
-						UUID:            pack.UUID,
+						UUID:            pack.UUID.String(),
 						Version:         pack.Version,
 						Size:            pack.Size,
 						ContentKey:      pack.ContentKey,
@@ -1272,6 +1260,13 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				Parameters:       pk.Parameters,
 				XUID:             pk.XUID,
 				PlatformChatID:   pk.PlatformChatID,
+			},
+		}
+	case *packet.Transfer:
+		return []packet.Packet{
+			&legacypacket.Transfer{
+				Address: pk.Address,
+				Port:    pk.Port,
 			},
 		}
 	case *packet.UpdateAbilities:

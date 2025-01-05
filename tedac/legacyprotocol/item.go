@@ -131,7 +131,7 @@ func Item(r *protocol.Reader, x *ItemStack) {
 	}
 	var count int32
 	r.Varint32(&count)
-	r.LimitInt32(count, 0, higherLimit)
+	LimitInt32(count, 0, higherLimit)
 
 	x.CanBePlacedOn = make([]string, count)
 	for i := int32(0); i < count; i++ {
@@ -139,7 +139,7 @@ func Item(r *protocol.Reader, x *ItemStack) {
 	}
 
 	r.Varint32(&count)
-	r.LimitInt32(count, 0, higherLimit)
+	LimitInt32(count, 0, higherLimit)
 
 	x.CanBreak = make([]string, count)
 	for i := int32(0); i < count; i++ {
