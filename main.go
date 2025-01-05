@@ -5,6 +5,7 @@ import (
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
+	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 )
 
 //go:embed all:frontend/dist
@@ -22,9 +23,11 @@ func main() {
 		Height:        525,
 		Frameless:     true,
 		DisableResize: true,
-		Assets:        assets,
-		OnStartup:     app.startup,
-		Bind:          []any{app},
+		AssetServer: &assetserver.Options{
+			Assets: assets,
+		},
+		OnStartup: app.startup,
+		Bind:      []any{app},
 	})
 	if err != nil {
 		panic(err)
