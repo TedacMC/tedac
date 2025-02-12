@@ -4,18 +4,18 @@ go 1.23.4
 
 require (
 	github.com/df-mc/atomic v1.10.0
-	github.com/df-mc/dragonfly v0.9.20-0.20250103184915-3fa095d50417
-	github.com/df-mc/worldupgrader v1.0.18
+	github.com/df-mc/dragonfly v0.10.2-0.20250212065227-313e63bba44f
+	github.com/df-mc/worldupgrader v1.0.19
 	github.com/go-gl/mathgl v1.2.0
 	github.com/google/uuid v1.6.0
 	github.com/hugolgst/rich-go v0.0.0-20210925091458-d59fb695d9c0
 	github.com/samber/lo v1.38.1
 	github.com/sandertv/go-raknet v1.14.2
-	github.com/sandertv/gophertunnel v1.43.0
+	github.com/sandertv/gophertunnel v1.44.1-0.20250211173944-b0dbda19ad6a
 	github.com/segmentio/fasthash v1.0.3
 	github.com/wailsapp/wails v1.16.9
 	github.com/wailsapp/wails/v2 v2.9.2
-	golang.org/x/oauth2 v0.24.0
+	golang.org/x/oauth2 v0.25.0
 )
 
 require (
@@ -46,7 +46,7 @@ require (
 	github.com/wailsapp/go-webview2 v1.0.16 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
-	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67 // indirect
+	golang.org/x/exp v0.0.0-20250103183323-7d7fa50e5329 // indirect
 	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
@@ -55,4 +55,4 @@ require (
 
 replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.4
 
-replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v0.0.34
+replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v0.0.35
