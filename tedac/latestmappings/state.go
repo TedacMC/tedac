@@ -37,13 +37,18 @@ var (
 
 // init initializes the item and state mappings.
 func init() {
-	var items map[string]int32
+	var items map[string]struct {
+		RuntimeID      int32          `nbt:"runtime_id"`
+		ComponentBased bool           `nbt:"component_based"`
+		Version        int32          `nbt:"version"`
+		Data           map[string]any `nbt:"data,omitempty"`
+	}
 	if err := nbt.Unmarshal(itemRuntimeIDData, &items); err != nil {
 		panic(err)
 	}
-	for name, rid := range items {
-		itemNamesToRuntimeIDs[name] = rid
-		itemRuntimeIDsToNames[rid] = name
+	for name, item := range items {
+		itemNamesToRuntimeIDs[name] = item.RuntimeID
+		itemRuntimeIDsToNames[item.RuntimeID] = name
 	}
 
 	dec := nbt.NewDecoder(bytes.NewBuffer(blockStateData))

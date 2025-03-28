@@ -712,6 +712,16 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 		if pk.SoundType == 113 || pk.SoundType == 145 || pk.SoundType == 151 || pk.SoundType <= 198 && pk.SoundType >= 195 || pk.SoundType == 222 || pk.SoundType == 227 {
 			return nil
 		}
+		return []packet.Packet{
+			&legacypacket.LevelSoundEvent{
+				SoundType:             pk.SoundType,
+				Position:              pk.Position,
+				ExtraData:             pk.ExtraData,
+				EntityType:            pk.EntityType,
+				BabyMob:               pk.BabyMob,
+				DisableRelativeVolume: pk.DisableRelativeVolume,
+			},
+		}
 	case *packet.PlayerSkin:
 		var patch struct {
 			Geometry struct {
