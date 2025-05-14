@@ -27,7 +27,7 @@ var (
 )
 
 var (
-	//go:embed item_runtime_ids.nbt
+	//go:embed vanilla_items.nbt
 	itemRuntimeIDData []byte
 	// itemRuntimeIDsToNames holds a map to translate item runtime IDs to string IDs.
 	itemRuntimeIDsToNames = map[int32]string{}

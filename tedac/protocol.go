@@ -50,6 +50,8 @@ func (Protocol) Packets(bool) packet.Pool {
 	pool[packet.IDText] = func() packet.Packet { return &legacypacket.Text{} }
 	pool[packet.IDStopSound] = func() packet.Packet { return &legacypacket.StopSound{} }
 	pool[packet.IDSetTitle] = func() packet.Packet { return &legacypacket.SetTitle{} }
+	pool[legacypacket.IDEntityFall] = func() packet.Packet { return &legacypacket.EntityFall{} }
+	pool[legacypacket.IDTickSync] = func() packet.Packet { return &legacypacket.TickSync{} }
 	return pool
 }
 
@@ -73,7 +75,6 @@ var nullBytes = []byte("null\n")
 
 // ConvertToLatest ...
 func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Packet {
-	// fmt.Printf("1.12 -> Latest: %T\n", pk)
 	switch pk := pk.(type) {
 	case *legacypacket.SetTitle:
 		return []packet.Packet{
@@ -239,9 +240,9 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 	case *packet.AdventureSettings:
 		// TODO: Send request ability instead?
 		return nil
-	}
-
-	if pk.ID() == 37 { // TODO: This is so fucking ugly why just why
+	case *legacypacket.EntityFall:
+		return nil
+	case *legacypacket.TickSync:
 		return nil
 	}
 	return []packet.Packet{pk}
@@ -249,11 +250,14 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 
 // ConvertFromLatest ...
 func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []packet.Packet {
-	// fmt.Printf("Latest -> 1.12: %T\n", pk)
 	switch pk := pk.(type) {
 	case *packet.RequestNetworkSettings:
 		return []packet.Packet{
 			&packet.RequestNetworkSettings{ClientProtocol: protocol.CurrentProtocol},
+		}
+	case *packet.BiomeDefinitionList:
+		return []packet.Packet{
+			&legacypacket.BiomeDefinitionList{SerialisedBiomeDefinitions: legacySerialisedBiomeDefinitions},
 		}
 	case *packet.Transfer:
 		return []packet.Packet{

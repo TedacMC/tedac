@@ -112,7 +112,7 @@ func (a *App) Connect(address string) error {
 			}
 			return true
 		},
-	}.Dial("raknet", address)
+	}.DialTimeout("raknet", address, time.Second*120)
 	if err != nil {
 		return err
 	}
@@ -141,8 +141,6 @@ func (a *App) Connect(address string) error {
 
 	a.remoteAddress = address
 	a.localPort = uint16(port)
-
-	go a.startRPC()
 
 	a.listener, err = minecraft.ListenConfig{
 		AllowInvalidPackets: true,
@@ -221,7 +219,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 	serverConn, err := minecraft.Dialer{
 		TokenSource: a.src,
 		ClientData:  clientData,
-	}.Dial("raknet", a.remoteAddress)
+	}.DialTimeout("raknet", a.remoteAddress, time.Second*120)
 	if err != nil {
 		panic(err)
 	}
