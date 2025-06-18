@@ -51,6 +51,6 @@ require (
 	golang.org/x/text v0.25.0 // indirect
 )
 
-replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.5
+replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.6
 
 replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v0.0.39
