@@ -244,10 +244,6 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 
 	// TODO: Component-ize the shit below.
 	rid := data.EntityRuntimeID
-	oldMovementSystem := data.PlayerMovementSettings.MovementType == protocol.PlayerMovementModeClient
-	if _, ok := conn.Protocol().(tedac.Protocol); ok {
-		oldMovementSystem = true
-	}
 
 	r := world.Overworld.Range()
 	pos := atomic.NewValue(data.PlayerPosition)
@@ -262,67 +258,64 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 
 	biomeBufferCache := make(map[protocol.ChunkPos][]byte)
 
-	if oldMovementSystem {
-		go func() {
-			t := time.NewTicker(time.Second / 20)
-			defer t.Stop()
+	go func() {
+		t := time.NewTicker(time.Second / 20)
+		defer t.Stop()
 
-			var tick uint64
-			for range t.C {
-				currentPos, originalPos := pos.Load(), lastPos.Load()
-				lastPos.Store(currentPos)
+		var tick uint64
+		for range t.C {
+			currentPos, originalPos := pos.Load(), lastPos.Load()
+			lastPos.Store(currentPos)
 
-				currentYaw, currentPitch := yaw.Load(), pitch.Load()
+			currentYaw, currentPitch := yaw.Load(), pitch.Load()
 
-				inputs := protocol.NewBitset(packet.PlayerAuthInputBitsetSize)
-				if startedSneaking.CompareAndSwap(true, false) {
-					inputs.Set(packet.InputFlagStartSneaking)
-				}
-				if stoppedSneaking.CompareAndSwap(true, false) {
-					inputs.Set(packet.InputFlagStopSneaking)
-				}
-				if startedSprinting.CompareAndSwap(true, false) {
-					inputs.Set(packet.InputFlagStartSprinting)
-				}
-				if stoppedSprinting.CompareAndSwap(true, false) {
-					inputs.Set(packet.InputFlagStopSprinting)
-				}
-				if startedGliding.CompareAndSwap(true, false) {
-					inputs.Set(packet.InputFlagStartGliding)
-				}
-				if stoppedGliding.CompareAndSwap(true, false) {
-					inputs.Set(packet.InputFlagStopGliding)
-				}
-				if startedSwimming.CompareAndSwap(true, false) {
-					inputs.Set(packet.InputFlagStartSwimming)
-				}
-				if stoppedSwimming.CompareAndSwap(true, false) {
-					inputs.Set(packet.InputFlagStopSwimming)
-				}
-				if startedJumping.CompareAndSwap(true, false) {
-					inputs.Set(packet.InputFlagJumping)
-				}
-
-				err := serverConn.WritePacket(&packet.PlayerAuthInput{
-					Delta:            currentPos.Sub(originalPos),
-					HeadYaw:          currentYaw,
-					InputData:        inputs,
-					InputMode:        packet.InputModeMouse,
-					InteractionModel: packet.InteractionModelCrosshair,
-					Pitch:            currentPitch,
-					PlayMode:         packet.PlayModeNormal,
-					Position:         currentPos,
-					Tick:             tick,
-					Yaw:              currentYaw,
-				})
-				if err != nil {
-					return
-				}
-				_ = serverConn.Flush()
-				tick++
+			inputs := protocol.NewBitset(packet.PlayerAuthInputBitsetSize)
+			if startedSneaking.CompareAndSwap(true, false) {
+				inputs.Set(packet.InputFlagStartSneaking)
 			}
-		}()
-	}
+			if stoppedSneaking.CompareAndSwap(true, false) {
+				inputs.Set(packet.InputFlagStopSneaking)
+			}
+			if startedSprinting.CompareAndSwap(true, false) {
+				inputs.Set(packet.InputFlagStartSprinting)
+			}
+			if stoppedSprinting.CompareAndSwap(true, false) {
+				inputs.Set(packet.InputFlagStopSprinting)
+			}
+			if startedGliding.CompareAndSwap(true, false) {
+				inputs.Set(packet.InputFlagStartGliding)
+			}
+			if stoppedGliding.CompareAndSwap(true, false) {
+				inputs.Set(packet.InputFlagStopGliding)
+			}
+			if startedSwimming.CompareAndSwap(true, false) {
+				inputs.Set(packet.InputFlagStartSwimming)
+			}
+			if stoppedSwimming.CompareAndSwap(true, false) {
+				inputs.Set(packet.InputFlagStopSwimming)
+			}
+			if startedJumping.CompareAndSwap(true, false) {
+				inputs.Set(packet.InputFlagJumping)
+			}
+
+			if err = serverConn.WritePacket(&packet.PlayerAuthInput{
+				Delta:            currentPos.Sub(originalPos),
+				HeadYaw:          currentYaw,
+				InputData:        inputs,
+				InputMode:        packet.InputModeMouse,
+				InteractionModel: packet.InteractionModelCrosshair,
+				Pitch:            currentPitch,
+				PlayMode:         packet.PlayModeNormal,
+				Position:         currentPos,
+				Tick:             tick,
+				Yaw:              currentYaw,
+			}); err != nil {
+				return
+			}
+			_ = serverConn.Flush()
+			tick++
+		}
+	}()
 	go func() {
 		defer a.listener.Disconnect(conn, "connection lost")
 		defer serverConn.Close()
@@ -333,17 +326,11 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 			}
 			switch pk := pk.(type) {
 			case *packet.MovePlayer:
-				if !oldMovementSystem {
-					break
-				}
 				pos.Store(pk.Position)
 				yaw.Store(pk.Yaw)
 				pitch.Store(pk.Pitch)
 				continue
 			case *packet.PlayerAction:
-				if !oldMovementSystem {
-					break
-				}
 				switch pk.ActionType {
 				case legacypacket.PlayerActionJump:
 					startedJumping.Store(true)
@@ -398,27 +385,18 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 			}
 			switch pk := pk.(type) {
 			case *packet.MovePlayer:
-				if !oldMovementSystem {
-					break
-				}
 				if pk.EntityRuntimeID == rid {
 					pos.Store(pk.Position)
 					yaw.Store(pk.Yaw)
 					pitch.Store(pk.Pitch)
 				}
 			case *packet.MoveActorAbsolute:
-				if !oldMovementSystem {
-					break
-				}
 				if pk.EntityRuntimeID == rid {
 					pos.Store(pk.Position)
 					yaw.Store(pk.Rotation[2])
 					pitch.Store(pk.Rotation[0])
 				}
 			case *packet.MoveActorDelta:
-				if !oldMovementSystem {
-					break
-				}
 				if pk.EntityRuntimeID == rid {
 					pos.Store(pk.Position)
 					yaw.Store(pk.Rotation[2])
