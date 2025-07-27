@@ -112,7 +112,7 @@ func (a *App) Connect(address string) error {
 			}
 			return true
 		},
-	}.DialTimeout("raknet", address, time.Second*120)
+	}.DialTimeout("raknet", address, time.Minute*2)
 	if err != nil {
 		return err
 	}
@@ -219,7 +219,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 	serverConn, err := minecraft.Dialer{
 		TokenSource: a.src,
 		ClientData:  clientData,
-	}.DialTimeout("raknet", a.remoteAddress, time.Second*120)
+	}.DialTimeout("raknet", a.remoteAddress, time.Minute*2)
 	if err != nil {
 		panic(err)
 	}

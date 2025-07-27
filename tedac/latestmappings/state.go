@@ -28,7 +28,7 @@ var (
 
 var (
 	//go:embed vanilla_items.nbt
-	itemRuntimeIDData []byte
+	vanillaItems []byte
 	// itemRuntimeIDsToNames holds a map to translate item runtime IDs to string IDs.
 	itemRuntimeIDsToNames = map[int32]string{}
 	// itemNamesToRuntimeIDs holds a map to translate item string IDs to runtime IDs.
@@ -43,7 +43,7 @@ func init() {
 		Version        int32          `nbt:"version"`
 		Data           map[string]any `nbt:"data,omitempty"`
 	}
-	if err := nbt.Unmarshal(itemRuntimeIDData, &items); err != nil {
+	if err := nbt.Unmarshal(vanillaItems, &items); err != nil {
 		panic(err)
 	}
 	for name, item := range items {

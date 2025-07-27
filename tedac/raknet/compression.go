@@ -32,7 +32,7 @@ func (ZLibCompression) Compress(decompressed []byte) ([]byte, error) {
 }
 
 // Decompress ...
-func (ZLibCompression) Decompress(compressed []byte) ([]byte, error) {
+func (ZLibCompression) Decompress(compressed []byte, _ int) ([]byte, error) {
 	buf := bytes.NewBuffer(compressed)
 	zlibReader, err := zlib.NewReader(buf)
 	if err != nil {
