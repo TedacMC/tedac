@@ -17,6 +17,7 @@ import (
 	"github.com/df-mc/atomic"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/google/uuid"
+	"github.com/pkg/browser"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
@@ -27,7 +28,6 @@ import (
 	"github.com/tedacmc/tedac/tedac/chunk"
 	"github.com/tedacmc/tedac/tedac/latestmappings"
 	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
-	"github.com/wailsapp/wails/lib/renderer/webview"
 	"golang.org/x/oauth2"
 )
 
@@ -37,15 +37,16 @@ type App struct {
 	remoteAddress string
 	localPort     uint16
 
-	src oauth2.TokenSource
-	ctx context.Context
+	src               oauth2.TokenSource
+	pendingDeviceCode string
+	ctx               context.Context
 
 	c chan interface{}
 }
 
 // NewApp creates a new App application struct.
 func NewApp() *App {
-	return &App{src: tokenSource(), c: make(chan interface{})}
+	return &App{c: make(chan interface{})}
 }
 
 // ProxyInfo ...
@@ -74,20 +75,41 @@ func (a *App) Terminate() {
 	_ = a.listener.Close()
 }
 
-// Connect starts Tedac and connects to a remote server.
-func (a *App) Connect(address string) error {
-	temp, err := net.ResolveUDPAddr("udp", ":0")
-	if err != nil {
-		return err
-	}
-	l, err := net.ListenUDP("udp", temp)
-	if err != nil {
-		return err
+// Connect starts Tedac and connects to a remote server. If localPort is 0, a random available port is used.
+func (a *App) Connect(address string, localPort uint16) error {
+	if a.src == nil {
+		// Try loading a cached token.
+		token := new(oauth2.Token)
+		tokenData, err := os.ReadFile("token.tok")
+		if err == nil {
+			_ = json.Unmarshal(tokenData, token)
+			src := auth.RefreshTokenSource(token)
+			if _, err = src.Token(); err == nil {
+				tok, _ := src.Token()
+				b, _ := json.Marshal(tok)
+				_ = os.WriteFile("token.tok", b, 0644)
+				a.src = src
+			}
+		}
+		if a.src == nil {
+			return errors.New("authentication required")
+		}
 	}
 
-	port := l.LocalAddr().(*net.UDPAddr).Port
-	if err = l.Close(); err != nil {
-		return err
+	port := int(localPort)
+	if port == 0 {
+		temp, err := net.ResolveUDPAddr("udp", ":0")
+		if err != nil {
+			return err
+		}
+		l, err := net.ListenUDP("udp", temp)
+		if err != nil {
+			return err
+		}
+		port = l.LocalAddr().(*net.UDPAddr).Port
+		if err = l.Close(); err != nil {
+			return err
+		}
 	}
 
 	p, err := minecraft.NewForeignStatusProvider(address)
@@ -498,49 +520,36 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 	}()
 }
 
-// tokenSource returns a token source for using with a gophertunnel client. It either reads it from the
-// token.tok file if cached or requests logging in with a device code.
-func tokenSource() oauth2.TokenSource {
-	token := new(oauth2.Token)
-	tokenData, err := os.ReadFile("token.tok")
-	if err == nil {
-		_ = json.Unmarshal(tokenData, token)
-	} else {
-		token = requestToken()
-	}
-	src := auth.RefreshTokenSource(token)
-	_, err = src.Token()
+// StartAuth begins the Microsoft device code authentication flow. It returns the URL the user should
+// visit to complete authentication.
+func (a *App) StartAuth() (string, error) {
+	resp, err := auth.StartDeviceAuth()
 	if err != nil {
-		// The cached refresh token expired and can no longer be used to obtain a new token. We require the
-		// user to log in again and use that token instead.
-		src = auth.RefreshTokenSource(requestToken())
+		return "", err
 	}
+	a.pendingDeviceCode = resp.DeviceCode
+	url := "https://login.live.com/oauth20_remoteconnect.srf?lc=1033&otc=" + resp.UserCode
+	_ = browser.OpenURL(url)
+	return url, nil
+}
+
+// FinishAuth polls for the completion of the device code authentication flow and saves the token.
+func (a *App) FinishAuth() error {
+	if a.pendingDeviceCode == "" {
+		return errors.New("no authentication in progress")
+	}
+	t, err := auth.PollDeviceAuth(a.pendingDeviceCode)
+	a.pendingDeviceCode = ""
+	if err != nil {
+		return err
+	}
+	if t == nil {
+		return errors.New("authentication timed out or was cancelled")
+	}
+	src := auth.RefreshTokenSource(t)
 	tok, _ := src.Token()
 	b, _ := json.Marshal(tok)
 	_ = os.WriteFile("token.tok", b, 0644)
-	return src
-}
-
-// requestToken opens a new WebView2 window and requests the user to log in. The token is returned if successful.
-func requestToken() *oauth2.Token {
-	resp, err := auth.StartDeviceAuth()
-	if err != nil {
-		panic(err)
-	}
-	view := webview.NewWebview(webview.Settings{
-		Title:  "Tedac Authentication",
-		URL:    "https://login.live.com/oauth20_remoteconnect.srf?lc=1033&otc=" + resp.UserCode,
-		Width:  500,
-		Height: 600,
-	})
-	view.Run()
-
-	t, err := auth.PollDeviceAuth(resp.DeviceCode)
-	if err != nil {
-		panic(err)
-	}
-	if t == nil {
-		panic(err)
-	}
-	return t
+	a.src = src
+	return nil
 }

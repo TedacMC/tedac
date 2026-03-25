@@ -8,11 +8,11 @@ require (
 	github.com/df-mc/worldupgrader v1.0.20
 	github.com/go-gl/mathgl v1.2.0
 	github.com/google/uuid v1.6.0
+	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/samber/lo v1.49.1
 	github.com/sandertv/go-raknet v1.14.3-0.20250525005230-991ee492a907
 	github.com/sandertv/gophertunnel v1.50.1
 	github.com/segmentio/fasthash v1.0.3
-	github.com/wailsapp/wails v1.16.9
 	github.com/wailsapp/wails/v2 v2.10.1
 	golang.org/x/oauth2 v0.30.0
 )
@@ -36,7 +36,6 @@ require (
 	github.com/leaanthony/u v1.1.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/tkrajina/go-reflector v0.5.8 // indirect

@@ -18,6 +18,7 @@ function Home() {
 
     const [address, setAddress] = useState(params.get("address") || "");
     const [port, setPort] = useState(params.get("port") || "19132");
+    const [localPort, setLocalPort] = useState(params.get("localPort") || "19132");
 
     const [checkNetIsolation, setCheckNetIsolation] = useState(true)
     useEffect(() => {
@@ -102,20 +103,35 @@ function Home() {
                             </div>
                             : null}
                     </div>
-                    <div className={"max-w-xs"}>
-                        <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-300">
-                            Port
-                        </label>
-                        <input type="text" id="port" autoComplete={"off"} value={port}
-                               onChange={(e) => {
-                                   if (!connectionButton) {
-                                       // We're connecting, so don't allow the user to change the port.
-                                       return
-                                   }
-                                   setPort(e.target.value)
-                               }}
-                               className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                               required></input>
+                    <div className={"flex flex-row gap-6"}>
+                        <div className={"max-w-xs"}>
+                            <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-300">
+                                Port
+                            </label>
+                            <input type="text" id="port" autoComplete={"off"} value={port}
+                                   onChange={(e) => {
+                                       if (!connectionButton) {
+                                           return
+                                       }
+                                       setPort(e.target.value)
+                                   }}
+                                   className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                                   required></input>
+                        </div>
+                        <div className={"max-w-xs"}>
+                            <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-300">
+                                Local Port
+                            </label>
+                            <input type="text" id="localPort" autoComplete={"off"} value={localPort}
+                                   onChange={(e) => {
+                                       if (!connectionButton) {
+                                           return
+                                       }
+                                       setLocalPort(e.target.value)
+                                   }}
+                                   className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                                   placeholder="19132"></input>
+                        </div>
                     </div>
                     <div className={"flex flex-row"}>
                         <button
@@ -130,10 +146,15 @@ function Home() {
                                 setConnectionLoader("inline");
 
                                 // Connect through the backend.
-                                Connect(address + ":" + port).then(() => {
+                                Connect(address + ":" + port, parseInt(localPort) || 0).then(() => {
                                     navigate("/connection");
                                 }).catch((e) => {
-                                    navigate(`/error?error=${e}&address=${address}&port=${port}`);
+                                    const err = String(e);
+                                    if (err.includes("authentication required")) {
+                                        navigate(`/auth?address=${address}&port=${port}&localPort=${localPort}`);
+                                    } else {
+                                        navigate(`/error?error=${err}&address=${address}&port=${port}&localPort=${localPort}`);
+                                    }
                                 });
                             }} disabled={!connectionButton}
                             className="inline-flex items-center text-white bg-slate-900 hover:bg-slate-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full sm:w-auto px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
@@ -156,7 +177,7 @@ function Home() {
                 </div>
             </div>
             {!checkNetIsolation ?
-                <LoopbackWarning path={`/?address=${address}&port=${port}`} navigate={navigate}></LoopbackWarning> : <></>}
+                <LoopbackWarning path={`/?address=${address}&port=${port}&localPort=${localPort}`} navigate={navigate}></LoopbackWarning> : <></>}
         </div>
 
     )

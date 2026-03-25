@@ -4,6 +4,7 @@ import React from 'react'
 import {render} from "react-dom";
 
 import Home from './Home';
+import Auth from "./Auth";
 import Connection from "./Connection";
 
 import './style.css'
@@ -15,6 +16,7 @@ render(
         <BrowserRouter>
             <Routes>
                 <Route path="/" element={<Home/>}/>
+                <Route path="/auth" element={<Auth/>}/>
                 <Route path="/connection" element={<Connection/>}/>
                 <Route path="/error" element={<Error/>}/>
                 <Route path="/loopback" element={<Loopback/>}/>

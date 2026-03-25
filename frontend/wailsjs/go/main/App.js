@@ -6,12 +6,20 @@ export function CheckNetIsolation() {
   return window['go']['main']['App']['CheckNetIsolation']();
 }
 
-export function Connect(arg1) {
-  return window['go']['main']['App']['Connect'](arg1);
+export function Connect(arg1, arg2) {
+  return window['go']['main']['App']['Connect'](arg1, arg2);
+}
+
+export function FinishAuth() {
+  return window['go']['main']['App']['FinishAuth']();
 }
 
 export function ProxyingInfo() {
   return window['go']['main']['App']['ProxyingInfo']();
+}
+
+export function StartAuth() {
+  return window['go']['main']['App']['StartAuth']();
 }
 
 export function Terminate() {
