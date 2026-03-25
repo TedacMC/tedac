@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/samber/lo"
@@ -761,35 +762,59 @@ var (
 	legacyAirRID = legacymappings.StateToRuntimeID("minecraft:air", nil)
 )
 
-// downgradeItem downgrades the input item stack to a legacy item stack. It returns a boolean indicating if the item was
-// downgraded successfully.
+// downgradeItem downgrades the input item stack to a legacy item stack. If the item doesn't exist in v1.12.0,
+// its original identity is preserved in NBT so upgradeItem can recover it.
 func downgradeItem(input protocol.ItemStack) legacyprotocol.ItemStack {
 	name, _ := latestmappings.ItemRuntimeIDToName(input.NetworkID)
-	networkID, _ := legacymappings.ItemIDByName(name)
+	networkID, ok := legacymappings.ItemIDByName(name)
+
+	nbtData := input.NBTData
+	if !ok {
+		nbtData = make(map[string]any, len(input.NBTData)+2)
+		maps.Copy(nbtData, input.NBTData)
+		nbtData["tedac_original_name"] = name
+		nbtData["tedac_original_meta"] = int32(input.MetadataValue)
+	}
+
 	return legacyprotocol.ItemStack{
 		ItemType: legacyprotocol.ItemType{
 			NetworkID:     int32(networkID),
 			MetadataValue: int16(input.MetadataValue),
 		},
 		Count:         int16(input.Count),
-		NBTData:       input.NBTData,
+		NBTData:       nbtData,
 		CanBePlacedOn: input.CanBePlacedOn,
 		CanBreak:      input.CanBreak,
 	}
 }
 
-// upgradeItem upgrades the input item stack to the latest item stack. It returns a boolean indicating if the item was
-// upgraded successfully.
+// upgradeItem upgrades the input item stack to the latest item stack. If the item was a downgraded unknown
+// item, the original identity is recovered from NBT.
 func upgradeItem(input legacyprotocol.ItemStack) protocol.ItemStack {
 	if input.ItemType.NetworkID == 0 {
 		return protocol.ItemStack{}
 	}
-	name, _ := legacymappings.ItemNameByID(int16(input.ItemType.NetworkID))
+	var name string
+	var metadataValue uint32
+	if originalName, ok := input.NBTData["tedac_original_name"].(string); ok {
+		name = originalName
+		if originalMeta, ok := input.NBTData["tedac_original_meta"].(int32); ok {
+			metadataValue = uint32(originalMeta)
+		}
+		delete(input.NBTData, "tedac_original_name")
+		delete(input.NBTData, "tedac_original_meta")
+		if len(input.NBTData) == 0 {
+			input.NBTData = nil
+		}
+	} else {
+		name, _ = legacymappings.ItemNameByID(int16(input.ItemType.NetworkID))
+		metadataValue = uint32(input.ItemType.MetadataValue)
+	}
 	networkID, _ := latestmappings.ItemNameToRuntimeID(name)
 	return protocol.ItemStack{
 		ItemType: protocol.ItemType{
 			NetworkID:     networkID,
-			MetadataValue: uint32(input.ItemType.MetadataValue),
+			MetadataValue: metadataValue,
 		},
 		Count:         uint16(input.Count),
 		NBTData:       input.NBTData,
